@@ -24,6 +24,24 @@ class Message():
             f'\tend_marker: {self.end_marker}\n'
         )
 
+    def get_buffer(self):
+        buffer = []
+
+        buffer.append(self.start_marker)
+        buffer.append(self.origin)
+        buffer.append(self.move)
+        buffer.append(self.recv_confirm)
+        buffer.append(self.end_marker)
+
+        return buffer
+
+    @staticmethod
+    def buffer_to_message(buffer):
+        message = Message(None)
+
+        #TODO
+        return
+
     pass
 
 
@@ -65,8 +83,8 @@ class Ring():
 
     def send_message(self, message: Message):
         print(f'Sending message: {message}')
-
-        data = pickle.dumps(message)
+    
+        data = pickle.dumps(message.get_buffer())
         self.send_socket.send(data)
 
         return
@@ -75,11 +93,10 @@ class Ring():
         print(f'Receiving...')
 
         data = self.recv_socket.recv(self.recv_port)
+        buffer = pickle.loads(data)
+        print(f'Data: {buffer}')
 
-        message: Message = pickle.loads(data)
-        print(message)
-
-        return message
+        return Message(None)
 
     pass
 
