@@ -6,6 +6,7 @@ from enum import Enum
 
 START_MARKER = 0b01110101
 END_MARKER = 0b0111010101
+BUFFER_SIZE = 1024
 
 
 class MessageType(Enum):
@@ -74,8 +75,7 @@ class Ring():
         machine_id: int,
         send_port: int,
         recv_port: int,
-        send_address,
-        recv_address
+        send_address
     ):
         self.machine_id = machine_id
 
@@ -86,7 +86,7 @@ class Ring():
         self.recv_port = recv_port
 
         self.send_address = send_address
-        self.recv_address = recv_address
+        self.recv_address = socket.gethostbyname(socket.gethostname())
 
         self.has_token = False
 
@@ -96,13 +96,12 @@ class Ring():
         pass
 
     def setup(self):
-        print(f'[S-SEND] Connecting to {self.send_address} on {self.send_port}')
-        self.send_socket.connect((self.send_address, self.send_port))
-        print('[S-SEND] Connected')
+        # print(f'[S-SEND] Connecting to {self.send_address} on {self.send_port}')
+        # self.send_socket.connect((self.send_address, self.send_port))
+        # print('[S-SEND] Connected')
 
-        print(f'[S-RECV] Binding to {self.recv_address} on {self.recv_port}')
         self.recv_socket.bind((self.recv_address, self.recv_port))
-        print('[S-RECV] Connected')
+        print(f'[S-RECV] Binded to {self.recv_address} on {self.recv_port}')
 
         return
 
@@ -116,7 +115,7 @@ class Ring():
         print(f'Sending message: {message}')
     
         data = pickle.dumps(message.get_buffer())
-        self.send_socket.send(data)
+        self.send_socket.sendto(data, (self.send_address, self.send_port))
 
         return
 
@@ -124,16 +123,17 @@ class Ring():
         print(f'Receiving...')
 
         start_marker = None
+        addr = None
         
         while (start_marker != START_MARKER):
-            data = self.recv_socket.recv(self.recv_port)
+            data, addr = self.recv_socket.recvfrom(BUFFER_SIZE)
             buffer = pickle.loads(data)
             start_marker = buffer[0]
 
         print(f'Data: {buffer}')
         
         message = Message.buffer_to_message(buffer)
-        print(f'Message: {message}')
+        print(f'Message from {addr}: {message}')
 
         return message
 

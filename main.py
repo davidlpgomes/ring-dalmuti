@@ -1,33 +1,75 @@
 import sys
+import socket
 
 from ring import Ring, Message, MessageType
 
 
+def get_local_address():
+    return socket.gethostbyname(socket.gethostname())
+
+
+def get_config_data():
+    num_players = 1
+    machine_id = -1
+    send_address = -1
+    send_port = -1
+    recv_port = -1
+
+    local_address = get_local_address()
+
+    with open('config.txt') as f:
+        num_players = int(f.readline().split()[1])
+
+        line = f.readline()
+        while line != '':
+            line = f.readline()
+
+            if 'MACHINE' not in line:
+                continue
+            
+            id = int(line.split()[1])
+            address = f.readline().split()[1].strip()
+
+            if address == local_address:
+                machine_id = id 
+                send_address = f.readline().split()[1].strip()
+                send_port = int(f.readline().split()[1])
+                recv_port = int(f.readline().split()[1])
+                break
+
+    return num_players, machine_id, send_port, recv_port, send_address
+
+
 def main():
-    print('Hello world!')
+    num_players, id, send_port, recv_port, send_address = get_config_data()
 
-    send_port = 6000
-    recv_port = 6001
-    machine_id = 2
+    if id == -1:
+        print('Machine configuration not found, exiting')
+        exit(-1)
 
-    if sys.argv[1] == 's':
-        machine_id = 1
-        send_port = 6001
-        recv_port = 6000
+    print('Machine configuration:\n'
+          f'\tID: {id}\n'
+          f'\tAddress: {get_local_address()}\n'
+          f'\tSend address: {send_address}\n'
+          f'\tSend port: {send_port}\n'
+          f'\tRecv port: {recv_port}\n'
+    )
 
-    ring = None
-
-    ring = Ring(machine_id, send_port, recv_port, '127.0.0.1', '127.0.0.1')
+    ring = Ring(
+        id,
+        send_port,
+        recv_port,
+        send_address
+    )
     ring.setup()
 
-    if sys.argv[1] == 's':
-        ring.send_message(Message(True, MessageType.PLAY_CARDS, 'this is a move'))
-    else:
-        ring.recv_message()
+    ring.send_message(Message(True, MessageType.PLAY_CARDS, 'this is a move'))
+    ring.recv_message()
 
     ring.cleanup()
 
     return
+
 
 if __name__ == '__main__':
     main()
