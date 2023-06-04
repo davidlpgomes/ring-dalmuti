@@ -12,11 +12,12 @@ class MessageType(Enum):
     PLAY_CARDS = 1
     PASS = 2
     TOKEN = 3
+    SETUP = 4
     # etc. 
 
 
 class Message():
-    def __init__(self, origin: bool, type, move: str):
+    def __init__(self, origin: bool, type: MessageType, move: str):
         self.start_marker = START_MARKER
         self.origin = 1 if bool else 0
 
