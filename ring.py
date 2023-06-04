@@ -14,13 +14,14 @@ class MessageType(Enum):
     PASS = 2
     TOKEN = 3
     SETUP = 4
+    DEAL = 5
     # etc. 
 
 
 class Message():
     def __init__(self, origin: bool, type: MessageType, move: str):
         self.start_marker = START_MARKER
-        self.origin = 1 if bool else 0
+        self.origin = 1 if origin else 0
 
         self.type = type
 

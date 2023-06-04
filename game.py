@@ -4,6 +4,7 @@ import random
 
 from ring import Ring, Message, MessageType
 
+
 class Card(Enum):
     DALMUTI = 1
     ARCHBISHOP = 2
@@ -20,7 +21,8 @@ class Card(Enum):
     JESTER = 13
 
     def __repr__(self) -> str:
-        return f"{self.name} {self.value}"
+        return f"{self.value}"
+
 
 class Deck():
     def __init__(self):
@@ -46,11 +48,12 @@ class Deck():
 
     pass
 
+
 class Game():
     def __init__(self, num_of_players: int, ring: Ring):
         self.num_of_players = num_of_players
-        self.players: List[Player] = []
 
+        self.players: List[Player] = []
         for p in range(num_of_players):
             self.players.append(Player(p+1))
 
@@ -61,32 +64,34 @@ class Game():
     def setup(self):
         cards = self.deck.get_n_cards(self.num_of_players)
 
-        best_index = cards.index(max(cards, key=lambda c: c.value))
-
-        move=""
         for (i, card) in enumerate(cards):
-            move += f"player{i+1}: {card}"
-            if i == best_index:
-                move += " *Great Dalmuti*"
-                self.players[i].is_dalmuti = True
-            move += "\n"
+            self.players[i].set_initial_card(card)
 
-        self.ring.send_message(Message(True, MessageType.SETUP, move))
-        #PASSAR O BASTÃO PARA O DALMUTI
+        self.players.sort(key=lambda p: p.initial_card.value)
 
-        self.deck.shuffle()
+        players= ""
+        for player in self.players:
+            players += f"{player.id}:{player.initial_card.value},"
+        players[:-1]
+
+        self.ring.send_message(Message(True, MessageType.SETUP, players))
 
     def deal(self):
+        self.deck.shuffle()
         cards = self.deck.get_cards()
         for (i, card) in enumerate(cards):
             self.players[i%self.num_of_players].recv_card(card)
 
-        #PASSAR AS CARTAS PROS JOGADORES
+        data=""
+        for player in self.players:
+            data += f"{player.id}:{player.cards};"
+        data[:-1]
+
+        self.ring.send_message(Message(True, MessageType.DEAL, data))
+
+
 
         
-
-
-
 class Player():
     def __init__(self, id: int):
         self.id = id
@@ -95,5 +100,13 @@ class Player():
 
     def recv_card(self, card: Card):
         self.cards.append(card)
+    
+    def set_initial_card(self, card: Card):
+        self.initial_card = card
+
+    def has_two_jesters(self):
+        return self.cards.count(Card.JESTER)
+    
+    
 
         
