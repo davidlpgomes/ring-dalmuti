@@ -111,11 +111,13 @@ class Hand():
         return self.__cards.count(Card.JESTER) == 2
     
     @staticmethod
-    def parse_hand(card_string: str, machine_id: int) -> List[Card]:
+    def parse_deal(card_string: str, machine_id: int) -> List[Card]:
         for item in card_string.split(";"):
             id, cards_str = item.split(":")
             if machine_id == int(id):
-                return [Card(int(value)) for value in cards_str.strip("[]").split(",")]
+                cards = [Card(int(value)) for value in cards_str.strip("[]").split(",")]
+                cards.sort()
+                return cards
 
 
     
