@@ -2,7 +2,7 @@ import sys
 import socket
 
 from ring import Ring, Message, MessageType
-from game import Deal
+from game import Game
 
 
 def get_local_address():
@@ -64,13 +64,9 @@ def main():
         send_address
     )
     ring.setup()
+    game = Game(ring, num_players, id)
 
-    if id == 1:
-        deal = Deal(num_players)
-        game_setup = deal.setup()
-        ring.send_message(Message(id, MessageType.SETUP, game_setup))
-    else:
-        msg = ring.recv_and_send_message()
+    game.run()
 
     ring.cleanup()
 

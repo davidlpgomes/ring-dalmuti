@@ -23,6 +23,9 @@ class Card(Enum):
     def __repr__(self) -> str:
         return f"{self.value}"
 
+    def __lt__(self, other) -> bool:
+        return self.value < other.value
+
 
 class Deck():
     def __init__(self):
@@ -125,42 +128,59 @@ class Hand():
 
 
 class Game:
-    def __init__(self, ring: Ring, id: int):
-        self.__had_revolution = False
+    def __init__(self, ring: Ring, num_players: int, id: int):
+        self.__num_players = num_players
         self.__id = id
         self.__ring = ring
         self.__hand = Hand()
+        self.__had_revolution = False
 
     def run(self):
+        if self.__id == 1:
+            self.run_as_dealer()
+            return
+
+        self.run_as_player()
+        return
+
+    def run_as_player(self):
+        print('Recebendo SETUP')
         setup_message = self.__ring.recv_and_send_message()
         self.__set_order(setup_message.move)
 
+        print('Recebendo DEAL')
         deal_message = self.__ring.recv_and_send_message()
-        self.__hand.parse_deal(deal_message, self.__id)
+        self.__hand.parse_deal(deal_message.move, self.__id)
 
+        print('Etapa REVOLUCAO')
         message = self.__ring.recv_and_send_message()
         while message.type != MessageType.ROUND_READY.value:
             if message.type != MessageType.TOKEN.value:
+                print('Received REVOLUTION')
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
                 self.__had_revolution = True
             else:
+                print('Received TOKEN')
                 self.__check_revolution()
                 self.__ring.give_token()
+                print('Giving TOKEN')
 
             message = self.__ring.recv_and_send_message()
 
+        print('Received ROUND_READY')
+
         return
 
-
-
     def run_as_dealer(self):
-        deal = Deal()
+        deal = Deal(self.__num_players)
 
+        print('Setting SETUP')
         setup = deal.setup()
         self.__set_order(setup)
         self.__ring.send_message(Message(self.__id, MessageType.SETUP, setup))
 
+        print('Setting DEAL')
         dealed_cards = deal.deal()
         self.__hand.parse_deal(dealed_cards, self.__id)
         self.__ring.send_message(Message(self.__id, MessageType.DEAL, dealed_cards))
@@ -168,17 +188,20 @@ class Game:
         self.__check_revolution()
         
         if not self.__had_revolution:
+            print('Giving token')
             self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
             if message.type != MessageType.TOKEN.value:
+                print('Received REVOLUTION')
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
                 self.__had_revolution = True
-            
+            else:
+                print('Received TOKEN')
 
+        print('Sending ROUND_READY')
         self.__ring.send_message(Message(self.__id, MessageType.ROUND_READY, ''))
-        
-
+        print('Round ready!') 
 
         return
 

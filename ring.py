@@ -122,8 +122,6 @@ class Ring():
         return
 
     def send_message(self, message: Message):
-        print(f'Sending message: {message}')
-    
         data = pickle.dumps(message.get_buffer())
         recv_message = None
 
@@ -137,9 +135,13 @@ class Ring():
 
             return
 
-    def recv_message(self) -> Message:
-        print(f'Receiving...')
+    def send_message_to_next(self, message: Message):
+        data = pickle.dumps(message.get_buffer())
+        self.send(data)
 
+        return
+
+    def recv_message(self) -> Message:
         start_marker = None
 
         addr = None
@@ -155,7 +157,6 @@ class Ring():
             start_marker = buffer[0]
 
         message = Message.buffer_to_message(buffer)
-        print(f'Message from {addr}: {message}')
 
         if message.type == MessageType.TOKEN.value:
             self.has_token = True
@@ -167,7 +168,7 @@ class Ring():
         message = self.set_received(message)
 
         if not self.has_token:
-            self.send_message(message)
+            self.send_message_to_next(message)
 
         return message
 
