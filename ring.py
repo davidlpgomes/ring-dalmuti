@@ -20,7 +20,6 @@ class MessageType(Enum):
     REVOLUTION = 6
     GREAT_REVOLUTION = 7
     ROUND_READY = 8
-    # etc. 
 
 
 class Message():
@@ -159,7 +158,10 @@ class Ring():
         message = Message.buffer_to_message(buffer)
 
         if message.type == MessageType.TOKEN.value:
-            self.has_token = True
+            if int(message.move) == self.machine_id:
+                self.has_token = True
+            else:
+                self.give_token()
 
         return message
 
@@ -172,8 +174,11 @@ class Ring():
 
         return message
 
-    def give_token(self):
-        message = Message(self.machine_id, MessageType.TOKEN, '')
+    def give_token(self, machine_id = -1):
+        if machine_id == -1:
+            machine_id = self.machine_id % self.num_machines + 1
+
+        message = Message(self.machine_id, MessageType.TOKEN, str(machine_id))
         data = pickle.dumps(message.get_buffer())
 
         self.send(data)
