@@ -6,7 +6,9 @@ from enum import Enum
 
 START_MARKER = 0b01110101
 END_MARKER = 0b0111010101
+
 BUFFER_SIZE = 1024
+SOCKET_TIMEOUT = 1.0
 
 
 class MessageType(Enum):
@@ -100,6 +102,8 @@ class Ring():
         self.recv_socket.bind((self.recv_address, self.recv_port))
         print(f'[S-RECV] Binded to {self.recv_address} on {self.recv_port}')
 
+        self.recv_socket.settimeout(SOCKET_TIMEOUT)
+
         return
 
     def cleanup(self):
@@ -132,15 +136,19 @@ class Ring():
         print(f'Receiving...')
 
         start_marker = None
+
         addr = None
+        data = None
         
         while (start_marker != START_MARKER):
-            data, addr = self.recv_socket.recvfrom(BUFFER_SIZE)
+            try:
+                data, addr = self.recv_socket.recvfrom(BUFFER_SIZE)
+            except socket.timeout:
+                continue
+
             buffer = pickle.loads(data)
             start_marker = buffer[0]
 
-        print(f'Data: {buffer}')
-        
         message = Message.buffer_to_message(buffer)
         print(f'Message from {addr}: {message}')
 
