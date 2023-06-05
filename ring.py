@@ -152,7 +152,19 @@ class Ring():
         message = Message.buffer_to_message(buffer)
         print(f'Message from {addr}: {message}')
 
+        if message.type == MessageType.TOKEN.value:
+            self.has_token = True
+
         return message
+
+    def give_token(self):
+        message = Message(self.machine_id, MessageType.TOKEN, '')
+        data = pickle.dumps(message.get_buffer())
+
+        self.send(data)
+        self.has_token = False
+
+        return
 
     pass
 
