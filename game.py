@@ -31,7 +31,7 @@ class Deck():
             else:
                 self.__cards += 2 * [card_type]
 
-        self.shuffle(self)
+        self.shuffle()
         pass
 
     def shuffle(self):
@@ -96,9 +96,28 @@ class Player():
     def set_initial_card(self, card: Card):
         self.initial_card = card
 
-    def has_two_jesters(self):
-        return self.cards.count(Card.JESTER)
+
+class Hand():
+    def __init__(self, cards: List[Card]):
+        self.__cards = cards
+
+    def get_cards(self) -> str:
+        return self.__cards
     
+    def use_cards(self, start: int, end: int):
+        self.__cards = self.__cards[:start] + self.__cards[end+1:]
+
+    def has_two_jesters(self):
+        return self.__cards.count(Card.JESTER) == 2
+    
+    @staticmethod
+    def parse_hand(card_string: str, machine_id: int) -> List[Card]:
+        for item in card_string.split(";"):
+            id, cards_str = item.split(":")
+            if machine_id == int(id):
+                return [Card(int(value)) for value in cards_str.strip("[]").split(",")]
+
+
     
 class Game:
-    pass        
+    pass
