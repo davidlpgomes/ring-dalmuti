@@ -2,8 +2,6 @@ from enum import Enum
 from typing import List
 import random
 
-from ring import Ring, Message, MessageType
-
 
 class Card(Enum):
     DALMUTI = 1
@@ -50,17 +48,16 @@ class Deck():
 
 
 class Deal():
-    def __init__(self, num_players: int, ring: Ring):
+    def __init__(self, num_players: int):
         self.num_players = num_players
 
         self.players: List[Player] = []
         for p in range(num_players):
             self.players.append(Player(p+1))
 
-        self.ring = ring
         self.deck = Deck()
 
-    def setup(self):
+    def setup(self) -> str:
         cards = self.deck.get_n_cards(self.num_players)
 
         for (i, card) in enumerate(cards):
@@ -71,11 +68,10 @@ class Deal():
         players= ""
         for player in self.players:
             players += f"{player.id}:{player.initial_card.value},"
-        players = players[:-1]
 
-        self.ring.send_message(Message(True, MessageType.SETUP, players))
+        return players[:-1]
 
-    def deal(self):
+    def deal(self) -> str:
         self.deck.shuffle()
         cards = self.deck.get_cards()
         for (i, card) in enumerate(cards):
@@ -84,9 +80,8 @@ class Deal():
         data=""
         for player in self.players:
             data += f"{player.id}:{player.cards};"
-        data = data[:-1]
 
-        self.ring.send_message(Message(True, MessageType.DEAL, data))
+        return data[:-1]
 
         
 class Player():
@@ -105,5 +100,5 @@ class Player():
         return self.cards.count(Card.JESTER)
     
     
-
-        
+class Game:
+    pass        

@@ -2,6 +2,7 @@ import sys
 import socket
 
 from ring import Ring, Message, MessageType
+from game import Deal
 
 
 def get_local_address():
@@ -63,7 +64,12 @@ def main():
     )
     ring.setup()
 
-    ring.send_message(Message(True, MessageType.PLAY_CARDS, 'this is a move'))
+    if id == 1:
+        deal = Deal(num_players)
+        game_setup = deal.setup()
+
+        ring.send_message(Message(True, MessageType.SETUP, game_setup))
+
     ring.recv_message()
 
     ring.cleanup()
