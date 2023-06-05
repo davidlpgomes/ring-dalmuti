@@ -57,6 +57,7 @@ def main():
     )
 
     ring = Ring(
+        num_players,
         id,
         send_port,
         recv_port,
@@ -69,8 +70,7 @@ def main():
         game_setup = deal.setup()
         ring.send_message(Message(id, MessageType.SETUP, game_setup))
     else:
-        msg = ring.recv_message()
-        ring.send_message(msg)
+        msg = ring.recv_and_send_message()
 
     ring.cleanup()
 

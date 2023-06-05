@@ -43,7 +43,7 @@ class Message():
             f'\torigin: {self.origin}\n'
             f'\ttype: {self.type}\n'
             f'\tmove: {self.move}\n'
-            f'\treceipt_confirmation: {self.recv_confirm}\n'
+            f'\treceipt_confirmation: {format(self.recv_confirm, "b")}\n'
             f'\tend_marker: {self.end_marker}\n'
         )
 
@@ -75,11 +75,13 @@ class Message():
 class Ring():
     def __init__(
         self,
+        num_machines: int,
         machine_id: int,
         send_port: int,
         recv_port: int,
         send_address
     ):
+        self.num_machines = num_machines
         self.machine_id = machine_id
 
         self.send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -127,7 +129,7 @@ class Ring():
             recv_message = self.recv_message()
 
             if recv_message.origin == self.machine_id:
-                print('Message returned from ring')
+                recv_message = self.set_received(recv_message)
                 break
 
         return
@@ -157,6 +159,15 @@ class Ring():
 
         return message
 
+    def recv_and_send_message(self) -> Message:
+        message = self.recv_message()
+        message = self.set_received(message)
+
+        if not self.has_token:
+            self.send_message(message)
+
+        return message
+
     def give_token(self):
         message = Message(self.machine_id, MessageType.TOKEN, '')
         data = pickle.dumps(message.get_buffer())
@@ -165,6 +176,10 @@ class Ring():
         self.has_token = False
 
         return
+
+    def set_received(self, message: Message):
+        message.recv_confirm |= 2 ** (self.num_machines - self.machine_id)
+        return message
 
     pass
 
