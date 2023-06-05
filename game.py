@@ -49,20 +49,19 @@ class Deck():
     pass
 
 
-class Game():
-    def __init__(self, num_of_players: int, ring: Ring):
-        self.num_of_players = num_of_players
+class Deal():
+    def __init__(self, num_players: int, ring: Ring):
+        self.num_players = num_players
 
         self.players: List[Player] = []
-        for p in range(num_of_players):
+        for p in range(num_players):
             self.players.append(Player(p+1))
 
         self.ring = ring
         self.deck = Deck()
 
-    
     def setup(self):
-        cards = self.deck.get_n_cards(self.num_of_players)
+        cards = self.deck.get_n_cards(self.num_players)
 
         for (i, card) in enumerate(cards):
             self.players[i].set_initial_card(card)
@@ -72,7 +71,7 @@ class Game():
         players= ""
         for player in self.players:
             players += f"{player.id}:{player.initial_card.value},"
-        players[:-1]
+        players = players[:-1]
 
         self.ring.send_message(Message(True, MessageType.SETUP, players))
 
@@ -80,16 +79,14 @@ class Game():
         self.deck.shuffle()
         cards = self.deck.get_cards()
         for (i, card) in enumerate(cards):
-            self.players[i%self.num_of_players].recv_card(card)
+            self.players[i%self.num_players].add_card(card)
 
         data=""
         for player in self.players:
             data += f"{player.id}:{player.cards};"
-        data[:-1]
+        data = data[:-1]
 
         self.ring.send_message(Message(True, MessageType.DEAL, data))
-
-
 
         
 class Player():
@@ -98,7 +95,7 @@ class Player():
         self.cards: List[Card] = []
         self.is_dalmuti = False
 
-    def recv_card(self, card: Card):
+    def add_card(self, card: Card):
         self.cards.append(card)
     
     def set_initial_card(self, card: Card):
