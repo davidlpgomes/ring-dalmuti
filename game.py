@@ -133,6 +133,8 @@ class Game:
         deal_message = self.__ring.recv_message() #RECEBER DEAL MESSAGE CERTINHO
         self.__hand.parse_deal(deal_message, self.__id)
 
+        #self.__ring.wait_token()
+        self.__check_revolution()
 
 
     def run_as_dealer(self):
@@ -145,11 +147,31 @@ class Game:
         dealed_cards = deal.deal()
         self.__hand.parse_deal(dealed_cards, self.__id)
         self.__ring.send_message(Message(True, MessageType.DEAL, dealed_cards)) #MANDAR DEAL MESSAGE CERTINHO
-        
+
+        self.__check_revolution()
 
     def __set_order(self, setup: str):
         self.__player_order: List[int] = []
         for player in setup.split(","):
             (p,_) = player.split(":")
             self.__player_order.append(p)
+
+    def __check_revolution(self):
+        if self.__hand.has_two_jesters():
+            res = ""
+            while res != "s" and res != "n":
+                res = input("Você tem 2 Jesters! Portanto deseja fazer uma revolução?[s/n]")[0]
+
+            if res == "s":
+                if self.__id == self.__player_order[-1]:
+                    self.__player_order.reverse()
+                    #FAZER A GRANDE REVOLUÇÃO
+                else:
+                    pass
+                    #FAZER A REVOLUÇÃO
+            elif res == "n":
+                pass
+                #PASSAR O BASTÃO A DIANTE
+
+        
         
