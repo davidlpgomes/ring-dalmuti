@@ -17,6 +17,9 @@ class MessageType(Enum):
     TOKEN = 3
     SETUP = 4
     DEAL = 5
+    REVOLUTION = 6
+    GREAT_REVOLUTION = 7
+    ROUND_READY = 8
     # etc. 
 
 
@@ -132,7 +135,7 @@ class Ring():
                 recv_message = self.set_received(recv_message)
                 break
 
-        return
+            return
 
     def recv_message(self) -> Message:
         print(f'Receiving...')

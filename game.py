@@ -46,8 +46,6 @@ class Deck():
     def get_cards(self):
         return self.__cards
 
-    pass
-
 
 class Deal():
     def __init__(self, num_players: int):
@@ -58,6 +56,7 @@ class Deal():
             self.players.append(Player(p+1))
 
         self.deck = Deck()
+        return
 
     def setup(self) -> str:
         cards = self.deck.get_n_cards(self.num_players)
@@ -93,9 +92,11 @@ class Player():
 
     def add_card(self, card: Card):
         self.cards.append(card)
+        return
     
     def set_initial_card(self, card: Card):
         self.initial_card = card
+        return
 
 
 class Hand():
@@ -107,6 +108,7 @@ class Hand():
     
     def use_cards(self, start: int, end: int):
         self.__cards = self.__cards[:start] + self.__cards[end+1:]
+        return
 
     def has_two_jesters(self):
         return self.__cards.count(Card.JESTER) == 2
@@ -118,23 +120,38 @@ class Hand():
                 self.__cards = [Card(int(value)) for value in cards_str.strip("[]").split(",")]
                 self.__cards.sort()
                 return
+            
+        return
 
 
 class Game:
     def __init__(self, ring: Ring, id: int):
+        self.__had_revolution = False
         self.__id = id
         self.__ring = ring
         self.__hand = Hand()
 
     def run(self):
-        setup_message = self.__ring.recv_message() #RECEBER SETUP MESSAGE CERTINHO
+        setup_message = self.__ring.recv_and_send_message()
         self.__set_order(setup_message.move)
 
-        deal_message = self.__ring.recv_message() #RECEBER DEAL MESSAGE CERTINHO
+        deal_message = self.__ring.recv_and_send_message()
         self.__hand.parse_deal(deal_message, self.__id)
 
-        #self.__ring.wait_token()
-        self.__check_revolution()
+        message = self.__ring.recv_and_send_message()
+        while message.type != MessageType.ROUND_READY.value:
+            if message.type != MessageType.TOKEN.value:
+                if message.type == MessageType.GREAT_REVOLUTION.value:
+                    self.__player_order.reverse()
+                self.__had_revolution = True
+            else:
+                self.__check_revolution()
+                self.__ring.give_token()
+
+            message = self.__ring.recv_and_send_message()
+
+        return
+
 
 
     def run_as_dealer(self):
@@ -142,19 +159,36 @@ class Game:
 
         setup = deal.setup()
         self.__set_order(setup)
-        self.__ring.send_message(Message(True, MessageType.SETUP, setup)) #MANDAR SETUP MESSAGE CERTINHO
+        self.__ring.send_message(Message(self.__id, MessageType.SETUP, setup))
 
         dealed_cards = deal.deal()
         self.__hand.parse_deal(dealed_cards, self.__id)
-        self.__ring.send_message(Message(True, MessageType.DEAL, dealed_cards)) #MANDAR DEAL MESSAGE CERTINHO
+        self.__ring.send_message(Message(self.__id, MessageType.DEAL, dealed_cards))
 
         self.__check_revolution()
+        
+        if not self.__had_revolution:
+            self.__ring.give_token()
+            message = self.__ring.recv_and_send_message()
+            if message.type != MessageType.TOKEN.value:
+                if message.type == MessageType.GREAT_REVOLUTION.value:
+                    self.__player_order.reverse()
+                self.__had_revolution = True
+            
+
+        self.__ring.send_message(Message(self.__id, MessageType.ROUND_READY, ''))
+        
+
+
+        return
 
     def __set_order(self, setup: str):
         self.__player_order: List[int] = []
         for player in setup.split(","):
             (p,_) = player.split(":")
             self.__player_order.append(p)
+
+        return
 
     def __check_revolution(self):
         if self.__hand.has_two_jesters():
@@ -165,13 +199,11 @@ class Game:
             if res == "s":
                 if self.__id == self.__player_order[-1]:
                     self.__player_order.reverse()
-                    #FAZER A GRANDE REVOLUÇÃO
+                    self.__ring.send_message(Message(self.__id, MessageType.GREAT_REVOLUTION, ""))
                 else:
-                    pass
-                    #FAZER A REVOLUÇÃO
-            elif res == "n":
-                pass
-                #PASSAR O BASTÃO A DIANTE
+                    self.__ring.send_message(Message(self.__id, MessageType.REVOLUTION, ""))
+
+        return
 
         
         
