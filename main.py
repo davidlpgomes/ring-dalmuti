@@ -67,10 +67,10 @@ def main():
     if id == 1:
         deal = Deal(num_players)
         game_setup = deal.setup()
-
-        ring.send_message(Message(True, MessageType.SETUP, game_setup))
-
-    ring.recv_message()
+        ring.send_message(Message(id, MessageType.SETUP, game_setup))
+    else:
+        msg = ring.recv_message()
+        ring.send_message(msg)
 
     ring.cleanup()
 

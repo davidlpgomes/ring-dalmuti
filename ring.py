@@ -19,9 +19,9 @@ class MessageType(Enum):
 
 
 class Message():
-    def __init__(self, origin: bool, type: MessageType, move: str):
+    def __init__(self, origin: int, type: MessageType, move: str):
         self.start_marker = START_MARKER
-        self.origin = 1 if origin else 0
+        self.origin = origin
 
         self.type = type
 
@@ -97,10 +97,6 @@ class Ring():
         pass
 
     def setup(self):
-        # print(f'[S-SEND] Connecting to {self.send_address} on {self.send_port}')
-        # self.send_socket.connect((self.send_address, self.send_port))
-        # print('[S-SEND] Connected')
-
         self.recv_socket.bind((self.recv_address, self.recv_port))
         print(f'[S-RECV] Binded to {self.recv_address} on {self.recv_port}')
 
@@ -112,11 +108,23 @@ class Ring():
 
         return
 
+    def send(self, data):
+        self.send_socket.sendto(data, (self.send_address, self.send_port))
+        return
+
     def send_message(self, message: Message):
         print(f'Sending message: {message}')
     
         data = pickle.dumps(message.get_buffer())
-        self.send_socket.sendto(data, (self.send_address, self.send_port))
+        recv_message = None
+
+        while True:
+            self.send(data)
+            recv_message = self.recv_message()
+
+            if recv_message.origin == self.machine_id:
+                print('Message returned from ring')
+                break
 
         return
 
