@@ -1,6 +1,7 @@
+from bisect import insort
 from enum import Enum
+from random import shuffle
 from typing import List
-import random
 
 from ring import Ring, Message, MessageType
 
@@ -40,7 +41,7 @@ class Deck():
         pass
 
     def shuffle(self):
-        random.shuffle(self.__cards)
+        shuffle(self.__cards)
         return
     
     def get_n_cards(self, n: int) -> List[Card]:
@@ -104,13 +105,45 @@ class Player():
 
 class Hand():
     def __init__(self):
-        self.__cards = []
+        self.__cards: List[Card] = []
 
-    def get_cards(self) -> str:
+    def get_cards(self) -> List[Card]:
         return self.__cards
+
+    def add_card(self, card: int):
+        card = Card(card)
+        insort(self.__cards, card)
+
+        return
+
+    def add_cards(self, cards: List[int]):
+        for card in cards:
+            self.add_card(card)
+
+        return
     
-    def use_cards(self, start: int, end: int):
-        self.__cards = self.__cards[:start] + self.__cards[end+1:]
+    def use_card_on_index(self, index: int):
+        self.__cards.pop(index)
+        return
+
+    def use_card(self, card: int):
+        cards = [c.value for c in self.__cards]
+        i = -1
+
+        try:
+            i = cards.index(card) 
+        except ValueError:
+            # Card is not in hand
+            return
+
+        self.use_card_on_index(i)
+
+        return
+
+    def use_cards(self, cards: List[int]):
+        for card in cards:
+            self.use_card(card)
+
         return
 
     def has_two_jesters(self):
@@ -125,6 +158,10 @@ class Hand():
                 return
             
         return
+
+    def get_n_best_cards(self, n = 1) -> str:
+        cards = [str(c.value) for c in self.__cards[:n]]
+        return ','.join(cards) 
 
 
 class Game:
@@ -169,6 +206,7 @@ class Game:
             message = self.__ring.recv_and_send_message()
 
         print('Received ROUND_READY')
+        self.__run_game()
 
         return
 
@@ -203,13 +241,107 @@ class Game:
         self.__ring.send_message(Message(self.__id, MessageType.ROUND_READY, ''))
         print('Round ready!') 
 
+        self.__ring.give_token(self.__player_order[-2])
+        self.__run_game()
+
+        return
+
+    def __run_game(self):
+        self.__pay_taxes()
+
+        return
+
+    def __pay_taxes(self):
+        """
+            - Lesser Peon has the token (!!!)
+            - Lesser Peon sends their best one card
+            - Lesser Peon gives the token to the Lesser Dalmuti
+            - Lesser Dalmuti sends one card to the Lesser Peon
+            - Lesser Dalmuti gives the token to the Greater Peon
+            - Greater Peon sends their best two cards to the Greater Dalmuti
+            - Greater Peon gives the token to the Greater Dalmuti
+            - Greater Dalmuti sends two cards to the Greater Peon
+            - Greater Dalmuti sends ROUND_READY
+        """
+
+        # Lesser Peon stuff
+        if self.__ring.has_token:
+            ld_id = self.__player_order[1]
+
+            card = self.__hand.get_n_best_cards(1)
+            self.__hand.use_card(card)
+
+            card = f'{ld_id}:{card}'
+
+            self.__ring.send_message(
+                Message(self.__id, MessageType.GIVE_CARDS, card)
+            )
+            self.__ring.give_token(ld_id)
+
+        message = self.__ring.recv_and_send_message()
+        while message.type != MessageType.ROUND_READY.value:
+            if message.type == MessageType.TOKEN.value:
+                if int(message.move) != self.__id:
+                    self.__ring.give_token()
+                else:
+                    if self.__player_order[0] == self.__id:
+                        # GREATER DALMUTI STUFF
+                        cards = '11,12' # TODO: Escolhe duas cartas
+
+                        u_cards = [int(c) for c in cards.split(',')]
+                        self.__hand.use_cards(u_cards)
+                        
+                        cards = f'{self.__player_order[-1]}:{cards}'
+                        self.__ring.send_message(
+                            Message(self.__id, MessageType.GIVE_CARDS, cards)
+                        )
+
+                        self.__ring.send_message(
+                            Message(self.__id, MessageType.ROUND_READY, '')
+                        )
+
+                        break
+                    elif self.__player_order[1] == self.__id:
+                        # LESSER DALMUTI STUFF
+                        card = '12' # TODO: Escolhe carta
+                        self.__hand.use_card(int(card))
+
+                        card = f'{self.__player_order[-2]}:{card}'
+                        self.__ring.send_message(
+                            Message(self.__id, MessageType.GIVE_CARDS, card)
+                        )
+
+                        self.__ring.give_token(self.__player_order[-1])
+                    elif self.__player_order[-1] == self.__id:
+                        # GREATER PEON STUFF
+                        cards = self.__hand.get_n_best_cards(2)
+                        
+                        u_cards = [int(c) for c in cards.split(',')]
+                        self.__hand.use_cards(u_cards)
+
+                        cards = f'{self.__player_order[0]}:{cards}'
+                        self.__ring.send_message(
+                            Message(self.__id, MessageType.GIVE_CARDS, cards)
+                        )
+
+                        self.__ring.give_token(self.__player_order[0])
+            elif message.type == MessageType.GIVE_CARDS.value:
+                id, cards = message.move.split(':')
+                id = int(id)
+                cards = [Card(int(c)) for c in cards.split(',')]
+
+                if id == self.__id:
+                    self.__hand.add_cards(cards)
+
+            message = self.__ring.recv_and_send_message()
+
         return
 
     def __set_order(self, setup: str):
         self.__player_order: List[int] = []
         for player in setup.split(","):
-            (p,_) = player.split(":")
-            self.__player_order.append(p)
+            p, _ = player.split(":")
+            self.__player_order.append(int(p))
 
         return
 

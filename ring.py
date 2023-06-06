@@ -20,6 +20,7 @@ class MessageType(Enum):
     REVOLUTION = 6
     GREAT_REVOLUTION = 7
     ROUND_READY = 8
+    GIVE_CARDS = 9
 
 
 class Message():
