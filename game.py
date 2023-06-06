@@ -2,6 +2,8 @@ from enum import Enum
 from typing import List
 import random
 
+from ring import Ring, Message, MessageType
+
 
 class Card(Enum):
     DALMUTI = 1
@@ -88,7 +90,6 @@ class Player():
     def __init__(self, id: int):
         self.id = id
         self.cards: List[Card] = []
-        self.is_dalmuti = False
 
     def add_card(self, card: Card):
         self.cards.append(card)
@@ -98,8 +99,8 @@ class Player():
 
 
 class Hand():
-    def __init__(self, cards: List[Card]):
-        self.__cards = cards
+    def __init__(self):
+        self.__cards = []
 
     def get_cards(self) -> str:
         return self.__cards
@@ -110,16 +111,45 @@ class Hand():
     def has_two_jesters(self):
         return self.__cards.count(Card.JESTER) == 2
     
-    @staticmethod
-    def parse_deal(card_string: str, machine_id: int) -> List[Card]:
+    def parse_deal(self, card_string: str, machine_id: int):
         for item in card_string.split(";"):
             id, cards_str = item.split(":")
             if machine_id == int(id):
-                cards = [Card(int(value)) for value in cards_str.strip("[]").split(",")]
-                cards.sort()
-                return cards
+                self.__cards = [Card(int(value)) for value in cards_str.strip("[]").split(",")]
+                self.__cards.sort()
+                return
 
 
-    
 class Game:
-    pass
+    def __init__(self, ring: Ring, id: int):
+        self.__id = id
+        self.__ring = ring
+        self.__hand = Hand()
+
+    def run(self):
+        setup_message = self.__ring.recv_message() #RECEBER SETUP MESSAGE CERTINHO
+        self.__set_order(setup_message.move)
+
+        deal_message = self.__ring.recv_message() #RECEBER DEAL MESSAGE CERTINHO
+        self.__hand.parse_deal(deal_message, self.__id)
+
+
+
+    def run_as_dealer(self):
+        deal = Deal()
+
+        setup = deal.setup()
+        self.__set_order(setup)
+        self.__ring.send_message(Message(True, MessageType.SETUP, setup)) #MANDAR SETUP MESSAGE CERTINHO
+
+        dealed_cards = deal.deal()
+        self.__hand.parse_deal(dealed_cards, self.__id)
+        self.__ring.send_message(Message(True, MessageType.DEAL, dealed_cards)) #MANDAR DEAL MESSAGE CERTINHO
+        
+
+    def __set_order(self, setup: str):
+        self.__player_order: List[int] = []
+        for player in setup.split(","):
+            (p,_) = player.split(":")
+            self.__player_order.append(p)
+        
