@@ -163,7 +163,7 @@ class Ring():
             if int(message.move) == self.machine_id:
                 self.has_token = True
             else:
-                self.give_token()
+                self.give_token(int(message.move))
 
         return message
     

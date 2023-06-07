@@ -170,7 +170,7 @@ class Game:
         self.__id = id
         self.__ring = ring
         self.__hand = Hand()
-        self.__had_revolution = False
+        self.__had_revolution = True
 
     def run(self):
         if self.__id == 1:
@@ -252,8 +252,9 @@ class Game:
         return
 
     def __run_game(self):
-        self.__ring.wait_token_settle()
-        
+        if not self.__ring.has_token:
+            self.__ring.wait_token_settle()
+
         if not self.__had_revolution:
             self.__pay_taxes()
 
