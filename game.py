@@ -243,9 +243,9 @@ class Game:
         print('Round ready!') 
 
         if self.__had_revolution:
-            self.__ring.give_token(self.__player_order[-2])
-        else:
             self.__ring.give_token(self.__player_order[0])
+        else:
+            self.__ring.give_token(self.__player_order[-2])
 
         self.__run_game()
 
@@ -253,8 +253,15 @@ class Game:
 
     def __run_game(self):
         self.__ring.wait_token_settle()
+        
         if not self.__had_revolution:
             self.__pay_taxes()
+
+        print(f"{self.__player_order}")
+
+        if self.__ring.has_token:
+            print("I AM THE GREAT DALMUTI")
+
         return
 
     def __pay_taxes(self):

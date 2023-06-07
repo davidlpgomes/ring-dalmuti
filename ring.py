@@ -171,7 +171,6 @@ class Ring():
         while 1:
             message = self.recv_and_send_message()
             if self.has_token:
-                print("sou_jester")
                 self.send_message(Message(self.machine_id, MessageType.TOKEN_SETTLED, ""))
                 break
             elif message.type == MessageType.TOKEN_SETTLED.value:
@@ -192,6 +191,12 @@ class Ring():
     def give_token(self, machine_id = -1):
         if machine_id == -1:
             machine_id = self.machine_id % self.num_machines + 1
+
+        if machine_id == self.machine_id:
+            message = Message(self.machine_id, MessageType.TOKEN_SETTLED, "")
+            data = pickle.dumps(message.get_buffer())
+            self.send(data)
+            return
 
         message = Message(self.machine_id, MessageType.TOKEN, str(machine_id))
         data = pickle.dumps(message.get_buffer())
