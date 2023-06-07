@@ -217,6 +217,7 @@ class Game:
         setup = deal.setup()
         self.__set_order(setup)
         self.__ring.send_message(Message(self.__id, MessageType.SETUP, setup))
+        print(setup)
 
         print('Setting DEAL')
         dealed_cards = deal.deal()
@@ -241,19 +242,24 @@ class Game:
         self.__ring.send_message(Message(self.__id, MessageType.ROUND_READY, ''))
         print('Round ready!') 
 
-        self.__ring.give_token(self.__player_order[-2])
+        if self.__had_revolution:
+            self.__ring.give_token(self.__player_order[-2])
+        else:
+            self.__ring.give_token(self.__player_order[0])
+
         self.__run_game()
 
         return
 
     def __run_game(self):
-        self.__pay_taxes()
-
+        self.__ring.wait_token_settle()
+        if not self.__had_revolution:
+            self.__pay_taxes()
         return
 
     def __pay_taxes(self):
         """
-            - Lesser Peon has the token (!!!)
+            - Lesser Peon has the token (!!!) ✅
             - Lesser Peon sends their best one card
             - Lesser Peon gives the token to the Lesser Dalmuti
             - Lesser Dalmuti sends one card to the Lesser Peon
@@ -270,7 +276,7 @@ class Game:
 
             card = self.__hand.get_n_best_cards(1)
             self.__hand.use_card(card)
-
+            print(f"giving {card}")
             card = f'{ld_id}:{card}'
 
             self.__ring.send_message(
@@ -290,6 +296,8 @@ class Game:
 
                         u_cards = [int(c) for c in cards.split(',')]
                         self.__hand.use_cards(u_cards)
+
+                        print(f"giving {u_cards}")
                         
                         cards = f'{self.__player_order[-1]}:{cards}'
                         self.__ring.send_message(
@@ -307,6 +315,7 @@ class Game:
                         self.__hand.use_card(int(card))
 
                         card = f'{self.__player_order[-2]}:{card}'
+                        print(f"giving {card}")
                         self.__ring.send_message(
                             Message(self.__id, MessageType.GIVE_CARDS, card)
                         )
@@ -319,6 +328,7 @@ class Game:
                         u_cards = [int(c) for c in cards.split(',')]
                         self.__hand.use_cards(u_cards)
 
+                        print(f"giving {u_cards}")
                         cards = f'{self.__player_order[0]}:{cards}'
                         self.__ring.send_message(
                             Message(self.__id, MessageType.GIVE_CARDS, cards)
@@ -354,8 +364,10 @@ class Game:
             if res == "s":
                 if self.__id == self.__player_order[-1]:
                     self.__player_order.reverse()
+                    self.__had_revolution = True
                     self.__ring.send_message(Message(self.__id, MessageType.GREAT_REVOLUTION, ""))
                 else:
+                    self.__had_revolution = True
                     self.__ring.send_message(Message(self.__id, MessageType.REVOLUTION, ""))
 
         return

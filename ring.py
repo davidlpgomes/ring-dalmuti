@@ -21,6 +21,7 @@ class MessageType(Enum):
     GREAT_REVOLUTION = 7
     ROUND_READY = 8
     GIVE_CARDS = 9
+    TOKEN_SETTLED = 10
 
 
 class Message():
@@ -165,6 +166,19 @@ class Ring():
                 self.give_token()
 
         return message
+    
+    def wait_token_settle(self):
+        while 1:
+            message = self.recv_and_send_message()
+            if self.has_token:
+                print("sou_jester")
+                self.send_message(Message(self.machine_id, MessageType.TOKEN_SETTLED, ""))
+                break
+            elif message.type == MessageType.TOKEN_SETTLED.value:
+                break
+        print("token settled")
+        return
+
 
     def recv_and_send_message(self) -> Message:
         message = self.recv_message()
