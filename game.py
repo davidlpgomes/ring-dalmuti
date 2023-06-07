@@ -122,9 +122,11 @@ class Hand():
 
         return
     
-    def use_card_on_index(self, index: int):
-        self.__cards.pop(index)
-        return
+    def get_num_cards(self) -> int:
+        return len(self.__cards)
+    
+    def use_card_on_index(self, index: int) -> Card:
+        return self.__cards.pop(index)
 
     def use_card(self, card: int):
         cards = [c.value for c in self.__cards]
@@ -147,7 +149,7 @@ class Hand():
         return
 
     def has_two_jesters(self):
-        return self.__cards.count(Card.JESTER) == 2
+        return self.__cards.count(Card.JESTER) >= 2
     
     def parse_deal(self, card_string: str, machine_id: int):
         for item in card_string.split(";"):
@@ -158,6 +160,13 @@ class Hand():
                 return
             
         return
+    
+    def parse_given_cards(self, card_str: str) -> tuple(int, List[Card]):
+        id, cards = card_str.split(':')
+        id = int(id)
+
+        cards = [Card(int(c)) for c in cards.split(',')]
+        return id, cards
 
     def get_n_best_cards(self, n = 1) -> str:
         cards = [str(c.value) for c in self.__cards[:n]]
@@ -165,15 +174,14 @@ class Hand():
 
 
 class Game:
-    def __init__(self, ring: Ring, num_players: int, id: int):
+    def __init__(self, ring: Ring, num_players: int):
         self.__num_players = num_players
-        self.__id = id
         self.__ring = ring
         self.__hand = Hand()
         self.__had_revolution = True
 
     def run(self):
-        if self.__id == 1:
+        if self.__ring.machine_id == 1:
             self.run_as_dealer()
             return
 
@@ -187,7 +195,7 @@ class Game:
 
         print('Recebendo DEAL')
         deal_message = self.__ring.recv_and_send_message()
-        self.__hand.parse_deal(deal_message.move, self.__id)
+        self.__hand.parse_deal(deal_message.move, self.__ring.machine_id)
 
         print('Etapa REVOLUCAO')
         message = self.__ring.recv_and_send_message()
@@ -216,13 +224,13 @@ class Game:
         print('Setting SETUP')
         setup = deal.setup()
         self.__set_order(setup)
-        self.__ring.send_message(Message(self.__id, MessageType.SETUP, setup))
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.SETUP, setup))
         print(setup)
 
         print('Setting DEAL')
         dealed_cards = deal.deal()
-        self.__hand.parse_deal(dealed_cards, self.__id)
-        self.__ring.send_message(Message(self.__id, MessageType.DEAL, dealed_cards))
+        self.__hand.parse_deal(dealed_cards, self.__ring.machine_id)
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.DEAL, dealed_cards))
 
         self.__check_revolution()
         
@@ -239,13 +247,10 @@ class Game:
                 print('Received TOKEN')
 
         print('Sending ROUND_READY')
-        self.__ring.send_message(Message(self.__id, MessageType.ROUND_READY, ''))
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ''))
         print('Round ready!') 
 
-        if self.__had_revolution:
-            self.__ring.give_token(self.__player_order[0])
-        else:
-            self.__ring.give_token(self.__player_order[-2])
+        self.__ring.give_token(self.__player_order[0])
 
         self.__run_game()
 
@@ -267,7 +272,6 @@ class Game:
 
     def __pay_taxes(self):
         """
-            - Lesser Peon has the token (!!!) ✅
             - Lesser Peon sends their best one card
             - Lesser Peon gives the token to the Lesser Dalmuti
             - Lesser Dalmuti sends one card to the Lesser Peon
@@ -278,82 +282,50 @@ class Game:
             - Greater Dalmuti sends ROUND_READY
         """
 
-        # Lesser Peon stuff
-        if self.__ring.has_token:
-            ld_id = self.__player_order[1]
+        if self.__ring.machine_id == self.__player_order[0]:
+            self.__gd_taxes()
+        elif self.__ring.machine_id == self.__player_order[1]:
+            self.__ld_taxes()
+        elif self.__ring.machine_id == self.__player_order[-2]:
+            self.__lp_taxes()
+        elif self.__ring.machine_id == self.__player_order[-1]:
+            self.__gp_taxes()
+        return
+    
+    def __gd_taxes(self):
+        cards = [
+            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1), 
+            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 2)
+            ]
+        
+        gp_id = self.__player_order[-1]
+        move = f'{gp_id}:{cards}'
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
 
-            card = self.__hand.get_n_best_cards(1)
-            self.__hand.use_card(card)
-            print(f"giving {card}")
-            card = f'{ld_id}:{card}'
-
-            self.__ring.send_message(
-                Message(self.__id, MessageType.GIVE_CARDS, card)
-            )
-            self.__ring.give_token(ld_id)
+        self.__ring.give_token()
 
         message = self.__ring.recv_and_send_message()
-        while message.type != MessageType.ROUND_READY.value:
-            if message.type == MessageType.TOKEN.value:
-                if int(message.move) != self.__id:
-                    self.__ring.give_token()
-                else:
-                    if self.__player_order[0] == self.__id:
-                        # GREATER DALMUTI STUFF
-                        cards = '11,12' # TODO: Escolhe duas cartas
-
-                        u_cards = [int(c) for c in cards.split(',')]
-                        self.__hand.use_cards(u_cards)
-
-                        print(f"giving {u_cards}")
-                        
-                        cards = f'{self.__player_order[-1]}:{cards}'
-                        self.__ring.send_message(
-                            Message(self.__id, MessageType.GIVE_CARDS, cards)
-                        )
-
-                        self.__ring.send_message(
-                            Message(self.__id, MessageType.ROUND_READY, '')
-                        )
-
-                        break
-                    elif self.__player_order[1] == self.__id:
-                        # LESSER DALMUTI STUFF
-                        card = '12' # TODO: Escolhe carta
-                        self.__hand.use_card(int(card))
-
-                        card = f'{self.__player_order[-2]}:{card}'
-                        print(f"giving {card}")
-                        self.__ring.send_message(
-                            Message(self.__id, MessageType.GIVE_CARDS, card)
-                        )
-
-                        self.__ring.give_token(self.__player_order[-1])
-                    elif self.__player_order[-1] == self.__id:
-                        # GREATER PEON STUFF
-                        cards = self.__hand.get_n_best_cards(2)
-                        
-                        u_cards = [int(c) for c in cards.split(',')]
-                        self.__hand.use_cards(u_cards)
-
-                        print(f"giving {u_cards}")
-                        cards = f'{self.__player_order[0]}:{cards}'
-                        self.__ring.send_message(
-                            Message(self.__id, MessageType.GIVE_CARDS, cards)
-                        )
-
-                        self.__ring.give_token(self.__player_order[0])
-            elif message.type == MessageType.GIVE_CARDS.value:
-                id, cards = message.move.split(':')
-                id = int(id)
-                cards = [Card(int(c)) for c in cards.split(',')]
-
-                if id == self.__id:
-                    self.__hand.add_cards(cards)
-
+        while 1:
+            if message.type == MessageType.GIVE_CARDS.value:
+                id, g_cards = self.__hand.parse_given_cards()
+                if id == self.__ring.machine_id:
+                    self.__hand.add_cards(g_cards)
+            if self.__ring.has_token:
+                break
             message = self.__ring.recv_and_send_message()
 
-        return
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ""))
+
+
+
+    def __ld_taxes(self):
+        pass
+
+    def __lp_taxes(self):
+        pass
+
+    def __gp_taxes(self):
+        pass
 
     def __set_order(self, setup: str):
         self.__player_order: List[int] = []
@@ -370,13 +342,13 @@ class Game:
                 res = input("Você tem 2 Jesters! Portanto deseja fazer uma revolução?[s/n]")[0]
 
             if res == "s":
-                if self.__id == self.__player_order[-1]:
+                if self.__ring.machine_id == self.__player_order[-1]:
                     self.__player_order.reverse()
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__id, MessageType.GREAT_REVOLUTION, ""))
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GREAT_REVOLUTION, ""))
                 else:
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__id, MessageType.REVOLUTION, ""))
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.REVOLUTION, ""))
 
         return
 

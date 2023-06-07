@@ -64,7 +64,7 @@ def main():
         send_address
     )
     ring.setup()
-    game = Game(ring, num_players, id)
+    game = Game(ring, num_players)
 
     game.run()
 
