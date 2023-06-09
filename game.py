@@ -22,7 +22,7 @@ class Card(Enum):
     JESTER = 13
 
     def __repr__(self) -> str:
-        return f"{self.value}"
+        return f'{self.value}'
 
     def __lt__(self, other) -> bool:
         return self.value < other.value
@@ -70,9 +70,9 @@ class Deal():
 
         self.players.sort(key=lambda p: p.initial_card.value)
 
-        players= ""
+        players= ''
         for player in self.players:
-            players += f"{player.id}:{player.initial_card.value},"
+            players += f'{player.id}:{player.initial_card.value},'
 
         return players[:-1]
 
@@ -82,9 +82,9 @@ class Deal():
         for (i, card) in enumerate(cards):
             self.players[i%self.num_players].add_card(card)
 
-        data=""
+        data=''
         for player in self.players:
-            data += f"{player.id}:{player.cards};"
+            data += f'{player.id}:{player.cards};'
 
         return data[:-1]
 
@@ -109,6 +109,9 @@ class Hand():
 
     def get_cards(self) -> List[Card]:
         return self.__cards
+    
+    def get_cards_by_copy(self) -> List[Card]:
+        return self.__cards.copy()
 
     def add_card(self, card: int):
         card = Card(card)
@@ -152,20 +155,23 @@ class Hand():
         return self.__cards.count(Card.JESTER) >= 2
     
     def parse_deal(self, card_string: str, machine_id: int):
-        for item in card_string.split(";"):
-            id, cards_str = item.split(":")
+        for item in card_string.split(';'):
+            id, cards_str = item.split(':')
             if machine_id == int(id):
-                self.__cards = [Card(int(value)) for value in cards_str.strip("[]").split(",")]
+                self.__cards = [Card(int(value)) for value in cards_str.strip('[]').split(',')]
                 self.__cards.sort()
                 return
             
         return
     
+    def is_empty(self):
+        return len(self.__cards) == 0
+    
     def parse_given_cards(self, card_str: str):
         id, cards = card_str.split(':')
         id = int(id)
 
-        cards = [Card(int(c)) for c in cards.strip("[]").split(',')]
+        cards = [Card(int(c)) for c in cards.strip('[]').split(',')]
         return id, cards
 
     def get_n_best_cards(self, n = 1) -> Card:
@@ -178,6 +184,8 @@ class Game:
         self.__ring = ring
         self.__hand = Hand()
         self.__had_revolution = False
+        self.__played_cards: List[Card] = []
+        self.__finish_order: List[int] = [] 
 
     def run(self):
         if self.__ring.machine_id == 1:
@@ -190,7 +198,7 @@ class Game:
     def run_as_player(self):
         print('Recebendo SETUP')
         setup_message = self.__ring.recv_and_send_message()
-        self.__set_order(setup_message.move)
+        self.__parse_order(setup_message.move)
 
         print('Recebendo DEAL')
         deal_message = self.__ring.recv_and_send_message()
@@ -222,7 +230,7 @@ class Game:
 
         print('Setting SETUP')
         setup = deal.setup()
-        self.__set_order(setup)
+        self.__parse_order(setup)
         self.__ring.send_message(Message(self.__ring.machine_id, MessageType.SETUP, setup))
         print(setup)
 
@@ -266,25 +274,62 @@ class Game:
             print(f'numero de cartas:{self.__hand.get_num_cards()}')
             print(self.__hand.get_cards())
 
-        print(f"{self.__player_order}")
-
-        if self.__ring.has_token:
-            print("I AM THE GREAT DALMUTI")
+        self.__play_cards()
 
         return
+    
+    def __play_cards(self):
+        while len(self.__finish_order) != self.__num_players:
+            if self.__ring.has_token:
+                valid_play = False
+                while not valid_play:
+                    cur_cards = self.__hand.get_cards_by_copy()
+
+                    played_cards = input('Insira as cartas que quer jogar:\n')
+                    played_cards = played_cards.split(' ')
+                    played_cards = [Card(int(c)) for c in played_cards]
+
+                    unique_p_cards = list(set(played_cards))
+
+                    try:
+                        unique_p_cards.remove(Card.JESTER)
+                    except ValueError:
+                        pass
+
+                    if len(unique_p_cards) > 1:
+                        print('Você deve jogar apenas cartas do mesmo tipo ou coringas...')
+                        continue
+                        
+
+                    for card in played_cards:
+                        try:
+                            cur_cards.remove(card)
+                        except ValueError:
+                            print('Você não tem alguma das cartas que jogou...')
+                            continue
+
+                    valid_play = True
+
+                self.__hand.use_cards(played_cards)
+
+                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.PLAY_CARDS, played_cards))
+
+                if self.__hand.is_empty():
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.HAND_EMPTY, ''))
+                    break
+
+                self.__go_to_next_player()
+
+            message = self.__ring.recv_and_send_message()
+            while message.type != MessageType.ROUND_FINISHED.value:
+
+                message = self.__ring.recv_and_send_message()
+
+    def __go_to_next_player(self):
+        next_index = (self.__player_order.index(self.__ring.machine_id) + 1) % self.__num_players
+        self.__ring.give_token(next_index)
 
     def __pay_taxes(self):
-        """
-            - Lesser Peon sends their best one card
-            - Lesser Peon gives the token to the Lesser Dalmuti
-            - Lesser Dalmuti sends one card to the Lesser Peon
-            - Lesser Dalmuti gives the token to the Greater Peon
-            - Greater Peon sends their best two cards to the Greater Dalmuti
-            - Greater Peon gives the token to the Greater Dalmuti
-            - Greater Dalmuti sends two cards to the Greater Peon
-            - Greater Dalmuti sends ROUND_READY
-        """
-
         if self.__ring.machine_id == self.__player_order[0]:
             self.__gd_taxes()
         elif self.__ring.machine_id == self.__player_order[1]:
@@ -301,15 +346,15 @@ class Game:
         return
     
     def __gd_taxes(self):
-        i_cards = input("escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n")
-        i_cards = i_cards.split(" ")
+        i_cards = input('escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n')
+        i_cards = i_cards.split(' ')
         i_cards = [int(c) for c in i_cards]
         print(i_cards)
         print(len(i_cards))
 
         while len(i_cards) != 2:
-            i_cards = input("escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n")
-            i_cards = i_cards.split(" ")
+            i_cards = input('escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n')
+            i_cards = i_cards.split(' ')
             i_cards = [int(c) for c in i_cards]
             print(i_cards)
 
@@ -334,7 +379,7 @@ class Game:
                 break
             message = self.__ring.recv_and_send_message()
 
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ""))
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ''))
 
         return
 
@@ -347,7 +392,7 @@ class Game:
                     self.__hand.add_cards(g_cards)
 
             if self.__ring.has_token:
-                card = input("escolha uma carta para trocar pela melhor do Lesser Peon:\n")
+                card = input('escolha uma carta para trocar pela melhor do Lesser Peon:\n')
 
                 card = int(card)
 
@@ -402,28 +447,28 @@ class Game:
 
         return
 
-    def __set_order(self, setup: str):
+    def __parse_order(self, setup: str):
         self.__player_order: List[int] = []
-        for player in setup.split(","):
-            p, _ = player.split(":")
+        for player in setup.split(','):
+            p, _ = player.split(':')
             self.__player_order.append(int(p))
 
         return
 
     def __check_revolution(self):
         if self.__hand.has_two_jesters():
-            res = ""
-            while res != "s" and res != "n":
-                res = input("Você tem 2 Jesters! Portanto deseja fazer uma revolução?[s/n]")[0]
+            res = ''
+            while res != 's' and res != 'n':
+                res = input('Você tem 2 Jesters! Portanto deseja fazer uma revolução?[s/n]')[0]
 
-            if res == "s":
+            if res == 's':
                 if self.__ring.machine_id == self.__player_order[-1]:
                     self.__player_order.reverse()
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GREAT_REVOLUTION, ""))
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GREAT_REVOLUTION, ''))
                 else:
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.REVOLUTION, ""))
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.REVOLUTION, ''))
 
         return
 
