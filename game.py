@@ -301,13 +301,25 @@ class Game:
         return
     
     def __gd_taxes(self):
-        cards = [
-            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1).value, 
-            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 2).value
-            ]
+        i_cards = input("escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n")
+        i_cards = i_cards.split(" ")
+        i_cards = [int(c) for c in i_cards]
+        print(i_cards)
+        print(len(i_cards))
+
+        while len(i_cards) != 2:
+            i_cards = input("escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n")
+            i_cards = i_cards.split(" ")
+            i_cards = [int(c) for c in i_cards]
+            print(i_cards)
+
+        cards = [Card(c) for c in i_cards]
+
+        self.__hand.use_cards(cards)
+
         
         gp_id = self.__player_order[-1]
-        move = f'{gp_id}:{cards}'
+        move = f'{gp_id}:{i_cards}'
         self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
 
         self.__ring.give_token()
@@ -335,7 +347,12 @@ class Game:
                     self.__hand.add_cards(g_cards)
 
             if self.__ring.has_token:
-                card = self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1).value
+                card = input("escolha uma carta para trocar pela melhor do Lesser Peon:\n")
+
+                card = int(card)
+
+                self.__hand.use_card(card)
+
                 lp_id = self.__player_order[-2]
                 move = f'{lp_id}:{card}'
                 self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
