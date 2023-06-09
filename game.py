@@ -142,9 +142,9 @@ class Hand():
 
         return
 
-    def use_cards(self, cards: List[int]):
+    def use_cards(self, cards: List[Card]):
         for card in cards:
-            self.use_card(card)
+            self.use_card(card.value)
 
         return
 
@@ -161,16 +161,15 @@ class Hand():
             
         return
     
-    def parse_given_cards(self, card_str: str) -> tuple(int, List[Card]):
+    def parse_given_cards(self, card_str: str):
         id, cards = card_str.split(':')
         id = int(id)
 
-        cards = [Card(int(c)) for c in cards.split(',')]
+        cards = [Card(int(c)) for c in cards.strip("[]").split(',')]
         return id, cards
 
-    def get_n_best_cards(self, n = 1) -> str:
-        cards = [str(c.value) for c in self.__cards[:n]]
-        return ','.join(cards) 
+    def get_n_best_cards(self, n = 1) -> Card:
+        return self.__cards[:n]
 
 
 class Game:
@@ -178,7 +177,7 @@ class Game:
         self.__num_players = num_players
         self.__ring = ring
         self.__hand = Hand()
-        self.__had_revolution = True
+        self.__had_revolution = False
 
     def run(self):
         if self.__ring.machine_id == 1:
@@ -261,7 +260,11 @@ class Game:
             self.__ring.wait_token_settle()
 
         if not self.__had_revolution:
+            print(f'numero de cartas:{self.__hand.get_num_cards()}')
+            print(self.__hand.get_cards())
             self.__pay_taxes()
+            print(f'numero de cartas:{self.__hand.get_num_cards()}')
+            print(self.__hand.get_cards())
 
         print(f"{self.__player_order}")
 
@@ -290,12 +293,17 @@ class Game:
             self.__lp_taxes()
         elif self.__ring.machine_id == self.__player_order[-1]:
             self.__gp_taxes()
+        else:
+            message = self.__ring.recv_and_send_message()
+            while message.type != MessageType.ROUND_READY.value:
+                message = self.__ring.recv_and_send_message()
+            
         return
     
     def __gd_taxes(self):
         cards = [
-            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1), 
-            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 2)
+            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1).value, 
+            self.__hand.use_card_on_index(self.__hand.get_num_cards() - 2).value
             ]
         
         gp_id = self.__player_order[-1]
@@ -307,7 +315,7 @@ class Game:
         message = self.__ring.recv_and_send_message()
         while 1:
             if message.type == MessageType.GIVE_CARDS.value:
-                id, g_cards = self.__hand.parse_given_cards()
+                id, g_cards = self.__hand.parse_given_cards(message.move)
                 if id == self.__ring.machine_id:
                     self.__hand.add_cards(g_cards)
             if self.__ring.has_token:
@@ -316,16 +324,66 @@ class Game:
 
         self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ""))
 
-
+        return
 
     def __ld_taxes(self):
-        pass
+        message = self.__ring.recv_and_send_message()
+        while message.type != MessageType.ROUND_READY.value:
+            if message.type == MessageType.GIVE_CARDS.value:
+                id, g_cards = self.__hand.parse_given_cards(message.move)
+                if id == self.__ring.machine_id:
+                    self.__hand.add_cards(g_cards)
+
+            if self.__ring.has_token:
+                card = self.__hand.use_card_on_index(self.__hand.get_num_cards() - 1).value
+                lp_id = self.__player_order[-2]
+                move = f'{lp_id}:{card}'
+                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+
+                self.__ring.give_token()
+            message = self.__ring.recv_and_send_message()
+
+        return
 
     def __lp_taxes(self):
-        pass
+        message = self.__ring.recv_and_send_message()
+        while message.type != MessageType.ROUND_READY.value:
+            if message.type == MessageType.GIVE_CARDS.value:
+                id, g_cards = self.__hand.parse_given_cards(message.move)
+                if id == self.__ring.machine_id:
+                    self.__hand.add_cards(g_cards)
+
+            if self.__ring.has_token:
+                card = self.__hand.get_n_best_cards(1)
+                self.__hand.use_cards(card)
+                ld_id = self.__player_order[1]
+                move = f'{ld_id}:{card}'
+                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+
+                self.__ring.give_token()
+            message = self.__ring.recv_and_send_message()
+
+        return
 
     def __gp_taxes(self):
-        pass
+        message = self.__ring.recv_and_send_message()
+        while message.type != MessageType.ROUND_READY.value:
+            if message.type == MessageType.GIVE_CARDS.value:
+                id, g_cards = self.__hand.parse_given_cards(message.move)
+                if id == self.__ring.machine_id:
+                    self.__hand.add_cards(g_cards)
+            
+            if self.__ring.has_token:
+                cards = self.__hand.get_n_best_cards(2)
+                self.__hand.use_cards(cards)
+                gd_id = self.__player_order[0]
+                move = f'{gd_id}:{cards}'
+                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+
+                self.__ring.give_token()
+            message = self.__ring.recv_and_send_message()
+
+        return
 
     def __set_order(self, setup: str):
         self.__player_order: List[int] = []
