@@ -22,6 +22,8 @@ class MessageType(Enum):
     ROUND_READY = 8
     GIVE_CARDS = 9
     TOKEN_SETTLED = 10
+    ROUND_FINISHED = 11
+    HAND_EMPTY = 12
 
 
 class Message():
@@ -45,10 +47,20 @@ class Message():
         return (f'--- Message: \n'
             f'\tstart_marker: {self.start_marker}\n'
             f'\torigin: {self.origin}\n'
-            f'\ttype: {self.type}\n'
+            f'\ttype: {MessageType(self.type)}\n'
             f'\tmove: {self.move}\n'
             f'\treceipt_confirmation: {format(self.recv_confirm, "b")}\n'
             f'\tend_marker: {self.end_marker}\n'
+        )
+    
+    def send_repr(self):
+        return (f'\t--- Message: \n'
+            f'\t\tstart_marker: {self.start_marker}\n'
+            f'\t\torigin: {self.origin}\n'
+            f'\t\ttype: {MessageType(self.type)}\n'
+            f'\t\tmove: {self.move}\n'
+            f'\t\treceipt_confirmation: {format(self.recv_confirm, "b")}\n'
+            f'\t\tend_marker: {self.end_marker}\n'
         )
 
     def get_buffer(self):
@@ -171,17 +183,20 @@ class Ring():
         while 1:
             message = self.recv_and_send_message()
             if self.has_token:
-                self.send_message(Message(self.machine_id, MessageType.TOKEN_SETTLED, ""))
+                self.send_message(Message(self.machine_id, MessageType.TOKEN_SETTLED, ''))
                 break
             elif message.type == MessageType.TOKEN_SETTLED.value:
                 break
-        print("token settled")
+        print('token settled')
         return
 
 
     def recv_and_send_message(self) -> Message:
         message = self.recv_message()
         message = self.set_received(message)
+
+        if message.type == MessageType.TOKEN.value:
+            return message
 
         if not self.has_token:
             self.send_message_to_next(message)
@@ -193,7 +208,7 @@ class Ring():
             machine_id = self.machine_id % self.num_machines + 1
 
         if machine_id == self.machine_id:
-            message = Message(self.machine_id, MessageType.TOKEN_SETTLED, "")
+            message = Message(self.machine_id, MessageType.TOKEN_SETTLED, '')
             data = pickle.dumps(message.get_buffer())
             self.send(data)
             return
