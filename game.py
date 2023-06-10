@@ -283,10 +283,13 @@ class Game:
     def __play_game(self):
         while len(self.__finish_order) != self.__num_players:
             if self.__ring.has_token:
-                print(self.__hand.get_cards())
-                played_cards = self.__get_valid_first_play()
+                if not self.__hand.is_empty():
+                    print(self.__hand.get_cards())
+                    played_cards = self.__get_valid_first_play()
 
-                self.__play_cards(played_cards)
+                    self.__play_cards(played_cards)
+                else:
+                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_FINISHED, ''))
 
                 self.__pass_to_next_player()
 
@@ -381,6 +384,12 @@ class Game:
 
             if unique_p_cards[0].value >= unique_t_cards[0].value:
                 print("Você precisa jogar cartas de valor menor que as que estão na mesa (ou passar)")
+                continue
+
+            if len(self.__table_cards) != len(played_cards):
+                print("Você precisa jogar a mesma quantidade de cartas que estão na mesa")
+                continue
+
             
             for card in played_cards:
                 try:
@@ -410,7 +419,7 @@ class Game:
 
     def __pass_to_next_player(self):
         next_index = (self.__player_order.index(self.__ring.machine_id) + 1) % self.__num_players
-        self.__ring.give_token(next_index)
+        self.__ring.give_token(self.__player_order[next_index])
 
     def __pay_taxes(self):
         if self.__ring.machine_id == self.__player_order[0]:
