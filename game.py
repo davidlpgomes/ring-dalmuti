@@ -179,12 +179,14 @@ class Hand():
 
 
 class Game:
+    __table_owner: int
+
     def __init__(self, ring: Ring, num_players: int):
         self.__num_players = num_players
         self.__ring = ring
         self.__hand = Hand()
         self.__had_revolution = False
-        self.__played_cards: List[Card] = []
+        self.__table_cards: List[Card] = []
         self.__finish_order: List[int] = [] 
 
     def run(self):
@@ -274,58 +276,139 @@ class Game:
             print(f'numero de cartas:{self.__hand.get_num_cards()}')
             print(self.__hand.get_cards())
 
-        self.__play_cards()
+        self.__play_game()
 
         return
     
-    def __play_cards(self):
+    def __play_game(self):
         while len(self.__finish_order) != self.__num_players:
             if self.__ring.has_token:
-                valid_play = False
-                while not valid_play:
-                    cur_cards = self.__hand.get_cards_by_copy()
+                print(self.__hand.get_cards())
+                played_cards = self.__get_valid_first_play()
 
-                    played_cards = input('Insira as cartas que quer jogar:\n')
-                    played_cards = played_cards.split(' ')
-                    played_cards = [Card(int(c)) for c in played_cards]
+                self.__play_cards(played_cards)
 
-                    unique_p_cards = list(set(played_cards))
-
-                    try:
-                        unique_p_cards.remove(Card.JESTER)
-                    except ValueError:
-                        pass
-
-                    if len(unique_p_cards) > 1:
-                        print('Você deve jogar apenas cartas do mesmo tipo ou coringas...')
-                        continue
-                        
-
-                    for card in played_cards:
-                        try:
-                            cur_cards.remove(card)
-                        except ValueError:
-                            print('Você não tem alguma das cartas que jogou...')
-                            continue
-
-                    valid_play = True
-
-                self.__hand.use_cards(played_cards)
-
-                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.PLAY_CARDS, played_cards))
-
-                if self.__hand.is_empty():
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.HAND_EMPTY, ''))
-                    break
-
-                self.__go_to_next_player()
+                self.__pass_to_next_player()
 
             message = self.__ring.recv_and_send_message()
             while message.type != MessageType.ROUND_FINISHED.value:
+                if message.type == MessageType.PLAY_CARDS.value:
+                    table_owner, cards = message.move.split(":")
+
+                    self.__table_owner = int(table_owner)
+                    self.__table_cards = [Card(int(c)) for c in cards.strip('[]').split(',')]
+
+                    print(f'Mesa: {self.__table_cards}')
+
+                if message.type == MessageType.HAND_EMPTY.value:
+                    self.__finish_order.append(message.origin)
+                    print(f'Final:{self.__finish_order}')
+
+                if self.__ring.has_token:
+                    if self.__table_owner == self.__ring.machine_id:
+                        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_FINISHED, ''))
+                        break
+                    else:
+                        if not self.__hand.is_empty():
+                            print(self.__hand.get_cards())
+                            played_cards = self.__get_valid_other_play()
+
+                            if len(played_cards) == 0:
+                                print("Passando a vez")
+                            else:
+                                self.__play_cards(played_cards)
+
+                        self.__pass_to_next_player()
 
                 message = self.__ring.recv_and_send_message()
 
-    def __go_to_next_player(self):
+    def __get_valid_first_play(self) -> List[Card]:
+        while True:
+            cur_cards = self.__hand.get_cards_by_copy()
+
+            played_cards = input('Insira as cartas que quer jogar:\n')
+            played_cards = played_cards.split(' ')
+            played_cards = [Card(int(c)) for c in played_cards]
+
+            unique_p_cards = list(set(played_cards))
+
+            try:
+                unique_p_cards.remove(Card.JESTER)
+            except ValueError:
+                pass
+
+            if len(unique_p_cards) > 1:
+                print('Você deve jogar apenas cartas do mesmo tipo ou coringas...')
+                continue
+                
+
+            for card in played_cards:
+                try:
+                    cur_cards.remove(card)
+                except ValueError:
+                    print('Você não tem alguma das cartas que jogou...')
+                    continue
+
+            return played_cards
+    
+    def __get_valid_other_play(self) -> List[Card]:
+        while True:
+            cur_cards = self.__hand.get_cards_by_copy()
+
+            played_cards = input('Insira as cartas que quer jogar (0 para passar a vez):\n')
+            played_cards = played_cards.split(' ')
+            if played_cards[0] == '0':
+                return []
+            played_cards = [Card(int(c)) for c in played_cards]
+
+            unique_p_cards = list(set(played_cards))
+
+            try:
+                unique_p_cards.remove(Card.JESTER)
+            except ValueError:
+                pass
+
+            if len(unique_p_cards) > 1:
+                print('Você deve jogar apenas cartas do mesmo tipo ou coringas...')
+                continue
+
+            try:
+                unique_p_cards.remove(Card.JESTER)
+            except ValueError:
+                pass
+
+            unique_t_cards = list(set(self.__table_cards))
+
+            if unique_p_cards[0].value >= unique_t_cards[0].value:
+                print("Você precisa jogar cartas de valor menor que as que estão na mesa (ou passar)")
+            
+            for card in played_cards:
+                try:
+                    cur_cards.remove(card)
+                except ValueError:
+                    print('Você não tem alguma das cartas que quer jogar...')
+                    continue
+
+            return played_cards
+        
+    def __play_cards(self, cards: List[Card]):
+        self.__hand.use_cards(cards)
+
+        move = f'{self.__ring.machine_id}:{cards}'
+
+        self.__table_owner = self.__ring.machine_id
+        self.__table_cards = cards
+
+        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.PLAY_CARDS, move))
+
+        if self.__hand.is_empty():
+            self.__ring.send_message(Message(self.__ring.machine_id, MessageType.HAND_EMPTY, ''))
+            self.__finish_order.append(self.__ring.machine_id)
+            print(f'Final: {self.__finish_order}')
+
+        return
+
+    def __pass_to_next_player(self):
         next_index = (self.__player_order.index(self.__ring.machine_id) + 1) % self.__num_players
         self.__ring.give_token(next_index)
 
