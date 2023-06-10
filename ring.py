@@ -134,7 +134,8 @@ class Ring():
         self.send_socket.sendto(data, (self.send_address, self.send_port))
         return
 
-    def send_message(self, message: Message):
+    def send_message(self, type: MessageType, move = ''):
+        message = Message(self.machine_id, type, move)
         #print(message.send_repr())
         #input('send_message')
         data = pickle.dumps(message.get_buffer())
@@ -188,7 +189,7 @@ class Ring():
         while 1:
             message = self.recv_and_send_message()
             if self.has_token:
-                self.send_message(Message(self.machine_id, MessageType.TOKEN_SETTLED, ''))
+                self.send_message(MessageType.TOKEN_SETTLED)
                 break
             elif message.type == MessageType.TOKEN_SETTLED.value:
                 break
