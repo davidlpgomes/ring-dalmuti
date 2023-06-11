@@ -148,7 +148,6 @@ class Ring():
 
             logging.debug('[SEND] Waiting message')
             recv_message = self.recv_message()
-            logging.debug(f'[SEND] Received message {recv_message}')
 
             if recv_message.origin == self.machine_id:
                 logging.debug(f'[SEND] Message went through the entire ring')
@@ -239,9 +238,7 @@ class Ring():
         logging.debug(f'[GT] Giving TOKEN to {machine_id}')
 
         if machine_id == self.machine_id:
-            message = Message(self.machine_id, MessageType.TOKEN_SETTLED, '')
-            data = pickle.dumps(message.get_buffer())
-            self.send(data)
+            self.send_message(MessageType.TOKEN_SETTLED)
 
             logging.debug(f'[GT] Giving TOKEN to yourself, TOKEN_SETTLED sent')
             return

@@ -326,7 +326,9 @@ class Game:
                 message = self.__ring.recv_and_send_message()
 
     def __get_valid_first_play(self) -> List[Card]:
-        while True:
+        valid = False
+
+        while not valid:
             cur_cards = self.__hand.get_cards_by_copy()
 
             played_cards = input('Insira as cartas que quer jogar:\n')
@@ -348,11 +350,19 @@ class Game:
             for card in played_cards:
                 try:
                     cur_cards.remove(card)
+                    valid = True
                 except ValueError:
                     print('Você não tem alguma das cartas que jogou...')
-                    continue
+                    valid = False
+                    break
+           
+            if not valid:
+                continue
 
-            return played_cards
+            break
+
+
+        return played_cards
     
     def __get_valid_other_play(self) -> List[Card]:
         while True:
