@@ -233,13 +233,13 @@ class Game:
         print('Setting SETUP')
         setup = deal.setup()
         self.__parse_order(setup)
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.SETUP, setup))
+        self.__ring.send_message(MessageType.SETUP, setup)
         print(setup)
 
         print('Setting DEAL')
         dealed_cards = deal.deal()
         self.__hand.parse_deal(dealed_cards, self.__ring.machine_id)
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.DEAL, dealed_cards))
+        self.__ring.send_message(MessageType.DEAL, dealed_cards)
 
         self.__check_revolution()
         
@@ -256,7 +256,7 @@ class Game:
                 print('Received TOKEN')
 
         print('Sending ROUND_READY')
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ''))
+        self.__ring.send_message(MessageType.ROUND_READY)
         print('Round ready!') 
 
         self.__ring.give_token(self.__player_order[0])
@@ -289,7 +289,7 @@ class Game:
 
                     self.__play_cards(played_cards)
                 else:
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_FINISHED, ''))
+                    self.__ring.send_message(MessageType.ROUND_FINISHED)
 
                 self.__pass_to_next_player()
 
@@ -309,7 +309,7 @@ class Game:
 
                 if self.__ring.has_token:
                     if self.__table_owner == self.__ring.machine_id:
-                        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_FINISHED, ''))
+                        self.__ring.send_message(MessageType.ROUND_FINISHED)
                         break
                     else:
                         if not self.__hand.is_empty():
@@ -408,10 +408,10 @@ class Game:
         self.__table_owner = self.__ring.machine_id
         self.__table_cards = cards
 
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.PLAY_CARDS, move))
+        self.__ring.send_message(MessageType.PLAY_CARDS, move)
 
         if self.__hand.is_empty():
-            self.__ring.send_message(Message(self.__ring.machine_id, MessageType.HAND_EMPTY, ''))
+            self.__ring.send_message(MessageType.HAND_EMPTY)
             self.__finish_order.append(self.__ring.machine_id)
             print(f'Final: {self.__finish_order}')
 
@@ -457,7 +457,7 @@ class Game:
         
         gp_id = self.__player_order[-1]
         move = f'{gp_id}:{i_cards}'
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+        self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
         self.__ring.give_token()
 
@@ -471,7 +471,7 @@ class Game:
                 break
             message = self.__ring.recv_and_send_message()
 
-        self.__ring.send_message(Message(self.__ring.machine_id, MessageType.ROUND_READY, ''))
+        self.__ring.send_message(MessageType.ROUND_READY)
 
         return
 
@@ -492,7 +492,7 @@ class Game:
 
                 lp_id = self.__player_order[-2]
                 move = f'{lp_id}:{card}'
-                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+                self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
                 self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
@@ -512,7 +512,7 @@ class Game:
                 self.__hand.use_cards(card)
                 ld_id = self.__player_order[1]
                 move = f'{ld_id}:{card}'
-                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+                self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
                 self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
@@ -532,7 +532,7 @@ class Game:
                 self.__hand.use_cards(cards)
                 gd_id = self.__player_order[0]
                 move = f'{gd_id}:{cards}'
-                self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GIVE_CARDS, move))
+                self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
                 self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
@@ -557,10 +557,10 @@ class Game:
                 if self.__ring.machine_id == self.__player_order[-1]:
                     self.__player_order.reverse()
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.GREAT_REVOLUTION, ''))
+                    self.__ring.send_message(MessageType.GREAT_REVOLUTION)
                 else:
                     self.__had_revolution = True
-                    self.__ring.send_message(Message(self.__ring.machine_id, MessageType.REVOLUTION, ''))
+                    self.__ring.send_message(MessageType.REVOLUTION)
 
         return
 
