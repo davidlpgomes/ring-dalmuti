@@ -1,8 +1,11 @@
+import logging
+
 from bisect import insort
 from enum import Enum
 from random import shuffle
 from typing import List
 
+from interface import Interface
 from ring import Ring, Message, MessageType
 
 
@@ -188,6 +191,21 @@ class Game:
         self.__had_revolution = False
         self.__table_cards: List[Card] = []
         self.__finish_order: List[int] = [] 
+        self.__interface = Interface(self)
+
+    def get_player_rank(self):
+        rank = self.__player_order.index(self.__ring.machine_id)
+
+        if rank == 0:
+            return 'Greater Dalmuti'
+        elif rank == 1:
+            return 'Lesser Dalmuti'
+        elif rank == self.__num_players - 1:
+            return 'Greater Peon'
+        elif rank == self.__num_players - 2:
+            return 'Lesser Peon'
+
+        return f'Merchant {rank - 1}'
 
     def run(self):
         if self.__ring.machine_id == 1:
@@ -198,31 +216,39 @@ class Game:
         return
 
     def run_as_player(self):
-        print('Recebendo SETUP')
+        logging.debug('Receiving SETUP')
         setup_message = self.__ring.recv_and_send_message()
         self.__parse_order(setup_message.move)
 
-        print('Recebendo DEAL')
+        self.__interface.print_game()
+
+        logging.debug('Receiving DEAL')
         deal_message = self.__ring.recv_and_send_message()
         self.__hand.parse_deal(deal_message.move, self.__ring.machine_id)
 
-        print('Etapa REVOLUCAO')
+        self.__interface.print_hand(self.__hand)
+
+        logging.debug('REVOLUTION step')
         message = self.__ring.recv_and_send_message()
+
         while message.type != MessageType.ROUND_READY.value:
             if message.type != MessageType.TOKEN.value:
-                print('Received REVOLUTION')
+                logging.debug('Received REVOLUTION')
+
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
+
                 self.__had_revolution = True
             else:
-                print('Received TOKEN')
+                logging.debug('Received TOKEN')
                 self.__check_revolution()
+
                 self.__ring.give_token()
-                print('Giving TOKEN')
+                logging.debug('Giving TOKEN')
 
             message = self.__ring.recv_and_send_message()
 
-        print('Received ROUND_READY')
+        logging.debug('Received ROUND_READY')
         self.__run_game()
 
         return
@@ -230,34 +256,40 @@ class Game:
     def run_as_dealer(self):
         deal = Deal(self.__num_players)
 
-        print('Setting SETUP')
+        logging.debug('Setting SETUP')
         setup = deal.setup()
+
         self.__parse_order(setup)
         self.__ring.send_message(MessageType.SETUP, setup)
-        print(setup)
 
-        print('Setting DEAL')
+        self.__interface.print_game()
+
+        logging.debug('Setting DEAL')
         dealed_cards = deal.deal()
+
         self.__hand.parse_deal(dealed_cards, self.__ring.machine_id)
         self.__ring.send_message(MessageType.DEAL, dealed_cards)
+
+        self.__interface.print_hand(self.__hand)
 
         self.__check_revolution()
         
         if not self.__had_revolution:
-            print('Giving token')
             self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
+
             if message.type != MessageType.TOKEN.value:
-                print('Received REVOLUTION')
+                logging.debug('Received REVOLUTION')
+
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
+
                 self.__had_revolution = True
             else:
-                print('Received TOKEN')
+                logging.debug('Received TOKEN')
 
-        print('Sending ROUND_READY')
+        logging.debug('Sending ROUND_READY')
         self.__ring.send_message(MessageType.ROUND_READY)
-        print('Round ready!') 
 
         self.__ring.give_token(self.__player_order[0])
 
@@ -282,11 +314,12 @@ class Game:
     
     def __play_game(self):
         while len(self.__finish_order) != self.__num_players:
+            self.__interface.print_game()
+            self.__interface.print_hand(self.__hand)
+
             if self.__ring.has_token:
                 if not self.__hand.is_empty():
-                    print(self.__hand.get_cards())
                     played_cards = self.__get_valid_first_play()
-
                     self.__play_cards(played_cards)
                 else:
                     self.__ring.send_message(MessageType.ROUND_FINISHED)
@@ -294,6 +327,7 @@ class Game:
                 self.__pass_to_next_player()
 
             message = self.__ring.recv_and_send_message()
+
             while message.type != MessageType.ROUND_FINISHED.value:
                 if message.type == MessageType.PLAY_CARDS.value:
                     table_owner, cards = message.move.split(":")
