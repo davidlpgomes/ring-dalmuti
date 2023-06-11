@@ -477,6 +477,8 @@ class Game:
         else:
             message = self.__ring.recv_and_send_message()
             while message.type != MessageType.ROUND_READY.value:
+                if self.__ring.has_token:
+                    self.__ring.give_token()
                 message = self.__ring.recv_and_send_message()
             
         return
