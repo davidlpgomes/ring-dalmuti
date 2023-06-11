@@ -1,8 +1,24 @@
-import sys
+import argparse
+import logging
 import socket
 
 from ring import Ring, Message, MessageType
 from game import Game
+
+
+def get_args():
+    parser = argparse.ArgumentParser(
+        description='The Great Dalmuti on a ring network.'
+    )
+
+    parser.add_argument(
+        '-d',
+        '--debug',
+        action='store_true',
+        help='run logging in debug mode'
+    )
+    
+    return parser.parse_args()
 
 
 def get_local_address():
@@ -18,37 +34,46 @@ def get_config_data():
 
     local_address = get_local_address()
 
-    with open('config.txt') as f:
-        num_players = int(f.readline().split()[1])
+    f = None
+    try:
+        f = open('config.txt')
+    except:
+        logging.error('File config.txt does not exist, exiting...')
+        exit(-1)
 
+    num_players = int(f.readline().split()[1])
+
+    line = f.readline()
+    while line != '':
         line = f.readline()
-        while line != '':
-            line = f.readline()
 
-            if 'MACHINE' not in line:
-                continue
+        if 'MACHINE' not in line:
+            continue
             
-            id = int(line.split()[1])
-            address = f.readline().split()[1].strip()
+        id = int(line.split()[1])
+        address = f.readline().split()[1].strip()
 
-            if address == local_address:
-                machine_id = id 
-                send_address = f.readline().split()[1].strip()
-                send_port = int(f.readline().split()[1])
-                recv_port = int(f.readline().split()[1])
-                break
+        if address == local_address:
+            machine_id = id 
+            send_address = f.readline().split()[1].strip()
+            send_port = int(f.readline().split()[1])
+            recv_port = int(f.readline().split()[1])
+            break
 
     return num_players, machine_id, send_port, recv_port, send_address
 
 
 def main():
+    args = get_args()
+
+    logging.basicConfig(
+        format='[%(levelname)s] %(message)s',
+        level=logging.DEBUG if args.debug else logging.WARNING
+    )
+
     num_players, id, send_port, recv_port, send_address = get_config_data()
 
-    if id == -1:
-        print('Machine configuration not found, exiting')
-        exit(-1)
-
-    print('Machine configuration:\n'
+    logging.info('Machine configuration:\n'
           f'\tID: {id}\n'
           f'\tAddress: {get_local_address()}\n'
           f'\tSend address: {send_address}\n'
