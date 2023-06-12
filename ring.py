@@ -25,6 +25,7 @@ class MessageType(Enum):
     TOKEN_SETTLED = 10
     ROUND_FINISHED = 11
     HAND_EMPTY = 12
+    MOCK_MESSAGE = 42
 
 
 class Message():

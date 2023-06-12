@@ -141,7 +141,6 @@ class Hand():
         try:
             i = cards.index(card) 
         except ValueError:
-            # Card is not in hand
             return
 
         self.use_card_on_index(i)
@@ -182,14 +181,13 @@ class Hand():
 
 
 class Game:
-    __table_owner: int
-
     def __init__(self, ring: Ring, num_players: int):
         self.__num_players = num_players
         self.__ring = ring
         self.__hand = Hand()
         self.__had_revolution = False
         self.__table_cards: List[Card] = []
+        self.__table_owner: int = 0
         self.__finish_order: List[int] = [] 
         self.__interface = Interface(self)
 
@@ -316,17 +314,11 @@ class Game:
         while len(self.__finish_order) != self.__num_players:
             self.__interface.print_game()
             self.__interface.print_hand(self.__hand)
-
-            if self.__ring.has_token:
-                if not self.__hand.is_empty():
-                    played_cards = self.__get_valid_first_play()
-                    self.__play_cards(played_cards)
-                else:
-                    self.__ring.send_message(MessageType.ROUND_FINISHED)
-
-                self.__pass_to_next_player()
-
-            message = self.__ring.recv_and_send_message()
+            
+            if not self.__ring.has_token:
+                message = self.__ring.recv_and_send_message()
+            else:
+                message = Message(self.__ring.machine_id, MessageType.MOCK_MESSAGE, '')
 
             while message.type != MessageType.ROUND_FINISHED.value:
                 if message.type == MessageType.PLAY_CARDS.value:
@@ -348,7 +340,10 @@ class Game:
                     else:
                         if not self.__hand.is_empty():
                             print(self.__hand.get_cards())
-                            played_cards = self.__get_valid_other_play()
+                            if len(self.__table_cards) == 0:
+                                played_cards = self.__get_valid_first_play()
+                            else:
+                                played_cards = self.__get_valid_other_play()
 
                             if len(played_cards) == 0:
                                 print("Passando a vez")
@@ -358,6 +353,9 @@ class Game:
                         self.__pass_to_next_player()
 
                 message = self.__ring.recv_and_send_message()
+
+            self.__table_cards = []
+            self.__table_owner = 0
 
     def __get_valid_first_play(self) -> List[Card]:
         valid = False
