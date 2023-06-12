@@ -1,9 +1,13 @@
 import logging
 
-
 class Interface():
-    def __init__(self, game):
-        self.__game = game
+    def __init__(self, id: int):
+        self.__id = id
+        self.__rank = ''
+        self.__order = ''
+        self.__table = ''
+        self.__finish_order = ''
+        self.__hand = ''
         pass
 
     @staticmethod
@@ -13,32 +17,46 @@ class Interface():
 
     def print_game(self):
         Interface.clear()
-        print(self.__game.get_player_rank())
-
+        self.__print_id()
+        self.__print_rank()
+        self.__print_order()
+        self.__print_finish()
+        self.__print_table()
+        self.__print_hand()
         return
+    
+    def set_rank(self, rank: str):
+        self.__rank = rank
 
-    def print_order(self, setup: str, id: int):
-        return
+    def set_order(self, order: str):
+        self.__order = order
 
+    def set_table(self, table: str):
+        self.__table = table
 
-    def print_hand(self, hand):
-        print('Mão: ', end='')
+    def set_finish(self, finish: str):
+        self.__finish_order = finish
 
-        cards = [c.value for c in hand.get_cards()]
+    def set_hand(self, hand: str):
+        self.__hand = hand
+    
+    def __print_id(self):
+        print(f'ID: {self.__id}')
 
-        if not cards:
-            print('vazia')
-            return
+    def __print_rank(self):
+        print(f'Rank: {self.__rank}')
 
-        card_present = sorted(set(cards))
+    def __print_order(self):
+        print(f'Ordem: {self.__order}')
 
-        for c in card_present[:len(card_present) - 1]:
-            print(f'{cards.count(c)}x {c}, ', end='')
+    def __print_table(self):
+        print(f'Mesa: {self.__table}')
 
-        last_c = card_present[len(card_present) - 1]
-        print(f'{cards.count(last_c)}x {last_c}')
+    def __print_finish(self):
+        print(f'Terminaram: {self.__finish_order}')
 
-        return
+    def __print_hand(self):
+        print(f'Mão: {self.__hand}')
 
     def ask_for_revolution(self) -> bool:
         return False

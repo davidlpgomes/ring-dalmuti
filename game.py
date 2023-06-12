@@ -189,7 +189,8 @@ class Game:
         self.__table_cards: List[Card] = []
         self.__table_owner: int = 0
         self.__finish_order: List[int] = [] 
-        self.__interface = Interface(self)
+        self.__interface = Interface(self.__ring.machine_id)
+        self.__current_player_index: int = 0
 
     def get_player_rank(self):
         rank = self.__player_order.index(self.__ring.machine_id)
@@ -218,13 +219,16 @@ class Game:
         setup_message = self.__ring.recv_and_send_message()
         self.__parse_order(setup_message.move)
 
-        self.__interface.print_game()
+        self.__interface.set_order(self.get_player_order())
+        self.__interface.set_rank(self.get_player_rank())
 
         logging.debug('Receiving DEAL')
         deal_message = self.__ring.recv_and_send_message()
         self.__hand.parse_deal(deal_message.move, self.__ring.machine_id)
 
-        self.__interface.print_hand(self.__hand)
+        self.__interface.set_hand(self.__hand.get_cards())
+
+        self.__interface.print_game()
 
         logging.debug('REVOLUTION step')
         message = self.__ring.recv_and_send_message()
@@ -235,6 +239,11 @@ class Game:
 
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
+
+                    self.__interface.set_order(self.get_player_order())
+                    self.__interface.set_rank(self.get_player_rank())
+                    self.__interface.print_game()
+                    print("GRANDE REVOLUÇÃO. A ordem foi invertida")
 
                 self.__had_revolution = True
             else:
@@ -258,17 +267,21 @@ class Game:
         setup = deal.setup()
 
         self.__parse_order(setup)
-        self.__ring.send_message(MessageType.SETUP, setup)
+        self.__interface.set_order(self.get_player_order())
+        self.__interface.set_rank(self.get_player_rank())
 
-        self.__interface.print_game()
+        self.__ring.send_message(MessageType.SETUP, setup)
 
         logging.debug('Setting DEAL')
         dealed_cards = deal.deal()
 
         self.__hand.parse_deal(dealed_cards, self.__ring.machine_id)
+
+        self.__interface.set_hand(self.__hand.get_cards())
+        self.__interface.print_game()
+
         self.__ring.send_message(MessageType.DEAL, dealed_cards)
 
-        self.__interface.print_hand(self.__hand)
 
         self.__check_revolution()
         
@@ -281,6 +294,8 @@ class Game:
 
                 if message.type == MessageType.GREAT_REVOLUTION.value:
                     self.__player_order.reverse()
+                    self.__interface.set_order(self.get_player_order())
+                    self.__interface.print_game()
 
                 self.__had_revolution = True
             else:
@@ -300,11 +315,9 @@ class Game:
             self.__ring.wait_token_settle()
 
         if not self.__had_revolution:
-            print(f'numero de cartas:{self.__hand.get_num_cards()}')
-            print(self.__hand.get_cards())
             self.__pay_taxes()
-            print(f'numero de cartas:{self.__hand.get_num_cards()}')
-            print(self.__hand.get_cards())
+            self.__interface.set_hand(self.__hand.get_cards())
+            self.__interface.print_game()
 
         self.__play_game()
 
@@ -313,7 +326,6 @@ class Game:
     def __play_game(self):
         while len(self.__finish_order) != self.__num_players:
             self.__interface.print_game()
-            self.__interface.print_hand(self.__hand)
             
             if not self.__ring.has_token:
                 message = self.__ring.recv_and_send_message()
@@ -322,16 +334,27 @@ class Game:
 
             while message.type != MessageType.ROUND_FINISHED.value:
                 if message.type == MessageType.PLAY_CARDS.value:
+                    self.__current_player_index = (self.__current_player_index + 1) % self.__num_players
+                    self.__interface.set_order(self.get_player_order())
+                    self.__interface.print_game()
                     table_owner, cards = message.move.split(":")
 
                     self.__table_owner = int(table_owner)
                     self.__table_cards = [Card(int(c)) for c in cards.strip('[]').split(',')]
 
-                    print(f'Mesa: {self.__table_cards}')
+                    self.__interface.set_table(self.__table_cards)
+                    self.__interface.print_game()
+
+                if message.type == MessageType.PASS.value:
+                    self.__current_player_index = (self.__current_player_index + 1) % self.__num_players
+                    self.__interface.set_order(self.get_player_order())
+                    self.__interface.print_game()
 
                 if message.type == MessageType.HAND_EMPTY.value:
                     self.__finish_order.append(message.origin)
-                    print(f'Final:{self.__finish_order}')
+
+                    self.__interface.set_finish(self.__finish_order)
+                    self.__interface.print_game()
 
                 if self.__ring.has_token:
                     if self.__table_owner == self.__ring.machine_id:
@@ -339,17 +362,22 @@ class Game:
                         break
                     else:
                         if not self.__hand.is_empty():
-                            print(self.__hand.get_cards())
                             if len(self.__table_cards) == 0:
                                 played_cards = self.__get_valid_first_play()
                             else:
                                 played_cards = self.__get_valid_other_play()
 
                             if len(played_cards) == 0:
-                                print("Passando a vez")
+                                
+                                self.__ring.send_message(MessageType.PASS)
                             else:
                                 self.__play_cards(played_cards)
+                        else:
+                            self.__ring.send_message(MessageType.PASS)
 
+                        self.__current_player_index = (self.__current_player_index + 1) % self.__num_players
+                        self.__interface.set_order(self.get_player_order())
+                        self.__interface.print_game()
                         self.__pass_to_next_player()
 
                 message = self.__ring.recv_and_send_message()
@@ -362,7 +390,7 @@ class Game:
 
         while not valid:
             cur_cards = self.__hand.get_cards_by_copy()
-
+            self.__interface.print_game()
             played_cards = input('Insira as cartas que quer jogar:\n')
             played_cards = played_cards.split(' ')
             played_cards = list(filter(lambda x: x.isdigit(), played_cards))
@@ -405,7 +433,7 @@ class Game:
     def __get_valid_other_play(self) -> List[Card]:
         while True:
             cur_cards = self.__hand.get_cards_by_copy()
-
+            self.__interface.print_game()
             played_cards = input('Insira as cartas que quer jogar (0 para passar a vez):\n')
             played_cards = played_cards.split(' ')
             if played_cards[0] == '0':
@@ -413,7 +441,7 @@ class Game:
             
             played_cards = list(filter(lambda x: x.isdigit(), played_cards))
             played_cards = list(filter(lambda x: int(x) <= 13 and int(x) >= 1, played_cards))
-            
+
             if len(played_cards) == 0:
                 continue
 
@@ -457,18 +485,25 @@ class Game:
         
     def __play_cards(self, cards: List[Card]):
         self.__hand.use_cards(cards)
+        self.__interface.set_hand(self.__hand.get_cards())
 
         move = f'{self.__ring.machine_id}:{cards}'
 
         self.__table_owner = self.__ring.machine_id
         self.__table_cards = cards
 
+        self.__interface.set_table(self.__table_cards)
+        self.__interface.print_game()
+
         self.__ring.send_message(MessageType.PLAY_CARDS, move)
 
         if self.__hand.is_empty():
             self.__ring.send_message(MessageType.HAND_EMPTY)
             self.__finish_order.append(self.__ring.machine_id)
-            print(f'Final: {self.__finish_order}')
+
+            self.__interface.set_finish(self.__finish_order)
+            self.__interface.print_game()
+
 
         return
 
@@ -498,6 +533,7 @@ class Game:
         cards: List[Card] = []
 
         while len(cards) != 2:
+            self.__interface.print_game()
             i_cards = input('escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n')
             i_cards = i_cards.split(' ')
 
@@ -552,6 +588,7 @@ class Game:
             if self.__ring.has_token:
                 cards: List[Card] = []
                 while len(cards) != 1:
+                    self.__interface.print_game()
                     i_cards = input('escolha uma carta para trocar pela melhor do Lesser Peon:\n')
                     i_cards = i_cards.split(' ')
 
@@ -630,17 +667,40 @@ class Game:
             self.__player_order.append(int(p))
 
         return
+    
+    def get_player_order(self) -> str:
+        ret = '['
+
+        for i, player in enumerate(self.__player_order):
+            if player == self.__player_order[self.__current_player_index] or (self.__current_player_index == 0 and i == 0):
+                ret += '\033[31m' + f'{player}' + '\033[0m, '
+            else:
+                ret += f'{player}, '
+
+        ret = ret[:-2]
+        ret += ']'
+
+        return ret
+
+
 
     def __check_revolution(self):
         if self.__hand.has_two_jesters():
             res = ''
             while res != 's' and res != 'n':
+                self.__interface.print_game()
                 res = input('Você tem 2 Jesters! Portanto deseja fazer uma revolução?[s/n]')[0]
 
             if res == 's':
                 if self.__ring.machine_id == self.__player_order[-1]:
                     self.__player_order.reverse()
                     self.__had_revolution = True
+
+                    self.__interface.set_order(self.get_player_order())
+                    self.__interface.set_rank(self.get_player_rank())
+                    self.__interface.print_game()
+                    print("GRANDE REVOLUÇÃO. A ordem foi invertida")
+
                     self.__ring.send_message(MessageType.GREAT_REVOLUTION)
                 else:
                     self.__had_revolution = True
