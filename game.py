@@ -365,6 +365,12 @@ class Game:
 
             played_cards = input('Insira as cartas que quer jogar:\n')
             played_cards = played_cards.split(' ')
+            played_cards = list(filter(lambda x: x.isdigit(), played_cards))
+            played_cards = list(filter(lambda x: int(x) <= 13 and int(x) >= 1, played_cards))
+
+            if len(played_cards) == 0:
+                continue
+
             played_cards = [Card(int(c)) for c in played_cards]
 
             unique_p_cards = list(set(played_cards))
@@ -404,6 +410,13 @@ class Game:
             played_cards = played_cards.split(' ')
             if played_cards[0] == '0':
                 return []
+            
+            played_cards = list(filter(lambda x: x.isdigit(), played_cards))
+            played_cards = list(filter(lambda x: int(x) <= 13 and int(x) >= 1, played_cards))
+            
+            if len(played_cards) == 0:
+                continue
+
             played_cards = [Card(int(c)) for c in played_cards]
 
             unique_p_cards = list(set(played_cards))
@@ -480,27 +493,36 @@ class Game:
                 message = self.__ring.recv_and_send_message()
             
         return
-    
-    def __gd_taxes(self):
-        i_cards = input('escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n')
-        i_cards = i_cards.split(' ')
-        i_cards = [int(c) for c in i_cards]
-        print(i_cards)
-        print(len(i_cards))
 
-        while len(i_cards) != 2:
+    def __gd_taxes(self):
+        cards: List[Card] = []
+
+        while len(cards) != 2:
             i_cards = input('escolha duas cartas para trocar pelas duas melhores do Greater Peon:\n')
             i_cards = i_cards.split(' ')
-            i_cards = [int(c) for c in i_cards]
-            print(i_cards)
 
-        cards = [Card(c) for c in i_cards]
+            i_cards = list(filter(lambda x: x.isdigit(), i_cards))
+            i_cards = list(filter(lambda x: int(x) <= 13 and int(x) >= 1, i_cards))
+
+            cards = [Card(int(c)) for c in i_cards]
+
+            if len(cards) != 2:
+                continue
+
+            h_cards = self.__hand.get_cards_by_copy()
+            for card in cards:
+                try:
+                    h_cards.remove(card)
+                except ValueError:
+                    print('Você não tem alguma das cartas que jogou...')
+                    cards.remove(card)
+                    break
 
         self.__hand.use_cards(cards)
 
         
         gp_id = self.__player_order[-1]
-        move = f'{gp_id}:{i_cards}'
+        move = f'{gp_id}:{cards}'
         self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
         self.__ring.give_token()
@@ -528,9 +550,27 @@ class Game:
                     self.__hand.add_cards(g_cards)
 
             if self.__ring.has_token:
-                card = input('escolha uma carta para trocar pela melhor do Lesser Peon:\n')
+                cards: List[Card] = []
+                while len(cards) != 1:
+                    i_cards = input('escolha uma carta para trocar pela melhor do Lesser Peon:\n')
+                    i_cards = i_cards.split(' ')
 
-                card = int(card)
+                    i_cards = list(filter(lambda x: x.isdigit(), i_cards))
+                    i_cards = list(filter(lambda x: int(x) <= 13 and int(x) >= 1, i_cards))
+
+                    cards = [Card(int(c)) for c in i_cards]
+
+                    h_cards = self.__hand.get_cards_by_copy()
+                    for card in cards:
+                        try:
+                            h_cards.remove(card)
+                        except ValueError:
+                            print('Você não tem alguma das cartas que jogou...')
+                            cards.remove(card)
+                            break
+
+
+                card = cards[0].value
 
                 self.__hand.use_card(card)
 
