@@ -60,6 +60,10 @@ def get_config_data():
             recv_port = int(f.readline().split()[1])
             break
 
+    if machine_id == -1:
+        print('Error: machine address is not in config.txt')
+        exit(1)
+
     return num_players, machine_id, send_port, recv_port, send_address
 
 
