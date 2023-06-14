@@ -383,6 +383,8 @@ class Game:
                 message = self.__ring.recv_and_send_message()
 
             self.__table_cards = []
+            self.__interface.set_table(self.__table_cards)
+            self.__interface.print_game()
             self.__table_owner = 0
 
     def __get_valid_first_play(self) -> List[Card]:
