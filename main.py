@@ -43,6 +43,10 @@ def get_config_data():
 
     num_players = int(f.readline().split()[1])
 
+    if num_players < 4 or num_players > 8:
+        print('O número de jogadores deve estar entre 4 e 8')
+        exit(1)
+
     line = f.readline()
     while line != '':
         line = f.readline()
