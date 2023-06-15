@@ -533,6 +533,7 @@ class Game:
 
     def __gd_taxes(self):
         cards: List[Card] = []
+        cards_to_add = None
 
         while len(cards) != 2:
             self.__interface.print_game()
@@ -558,7 +559,6 @@ class Game:
 
         self.__hand.use_cards(cards)
 
-        
         gp_id = self.__player_order[-1]
         move = f'{gp_id}:{cards}'
         self.__ring.send_message(MessageType.GIVE_CARDS, move)
@@ -570,22 +570,28 @@ class Game:
             if message.type == MessageType.GIVE_CARDS.value:
                 id, g_cards = self.__hand.parse_given_cards(message.move)
                 if id == self.__ring.machine_id:
-                    self.__hand.add_cards(g_cards)
+                    cards_to_add = g_cards
+
             if self.__ring.has_token:
                 break
             message = self.__ring.recv_and_send_message()
 
         self.__ring.send_message(MessageType.ROUND_READY)
+        
+        if cards_to_add:
+            self.__hand.add_cards(cards_to_add)
 
         return
 
     def __ld_taxes(self):
+        cards_to_add = None
+
         message = self.__ring.recv_and_send_message()
         while message.type != MessageType.ROUND_READY.value:
             if message.type == MessageType.GIVE_CARDS.value:
                 id, g_cards = self.__hand.parse_given_cards(message.move)
                 if id == self.__ring.machine_id:
-                    self.__hand.add_cards(g_cards)
+                    cards_to_add = g_cards
 
             if self.__ring.has_token:
                 cards: List[Card] = []
@@ -620,15 +626,21 @@ class Game:
                 self.__ring.give_token()
             message = self.__ring.recv_and_send_message()
 
+        if cards_to_add:
+            self.__hand.add_cards(cards_to_add)
+
         return
 
     def __lp_taxes(self):
+        cards_to_add = None
+
         message = self.__ring.recv_and_send_message()
         while message.type != MessageType.ROUND_READY.value:
             if message.type == MessageType.GIVE_CARDS.value:
                 id, g_cards = self.__hand.parse_given_cards(message.move)
+
                 if id == self.__ring.machine_id:
-                    self.__hand.add_cards(g_cards)
+                    cards_to_add = g_cards
 
             if self.__ring.has_token:
                 card = self.__hand.get_n_best_cards(1)
@@ -638,27 +650,40 @@ class Game:
                 self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
                 self.__ring.give_token()
+
             message = self.__ring.recv_and_send_message()
+
+        if cards_to_add:
+            self.__hand.add_cards(cards_to_add)
 
         return
 
     def __gp_taxes(self):
+        cards_to_add = None
+
         message = self.__ring.recv_and_send_message()
+
         while message.type != MessageType.ROUND_READY.value:
             if message.type == MessageType.GIVE_CARDS.value:
                 id, g_cards = self.__hand.parse_given_cards(message.move)
+
                 if id == self.__ring.machine_id:
-                    self.__hand.add_cards(g_cards)
+                    cards_to_add = g_cards
             
             if self.__ring.has_token:
                 cards = self.__hand.get_n_best_cards(2)
                 self.__hand.use_cards(cards)
+
                 gd_id = self.__player_order[0]
                 move = f'{gd_id}:{cards}'
-                self.__ring.send_message(MessageType.GIVE_CARDS, move)
 
+                self.__ring.send_message(MessageType.GIVE_CARDS, move)
                 self.__ring.give_token()
+
             message = self.__ring.recv_and_send_message()
+
+        if cards_to_add:
+            self.__hand.add_cards(cards_to_add)
 
         return
 
